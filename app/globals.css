@@ -1,0 +1,89 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { color-scheme: dark; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #09090E;
+  color: #EDEDF0;
+  -webkit-font-smoothing: antialiased;
+}
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2A2A40; border-radius: 99px; }
+::selection { background: rgba(99,130,255,0.25); }
+input, select, textarea, button { font-family: inherit; }
+input[type='number']::-webkit-inner-spin-button { opacity: 0; }
+
+/* ── Responsive grid helpers ───────────────────────────────────────── */
+.rg-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.rg-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+.rg-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.rg-form { display: grid; grid-template-columns: 1fr 390px; gap: 20px; align-items: start; }
+
+@media (max-width: 768px) {
+  .rg-2, .rg-3, .rg-4, .rg-form { grid-template-columns: 1fr !important; }
+
+  /* Page padding on mobile */
+  .page-wrap { padding: 16px !important; }
+  .page-title { font-size: 22px !important; }
+
+  /* Tables scroll on mobile */
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Category tabs wrap */
+  .cat-tabs { flex-wrap: wrap; gap: 6px !important; }
+
+  /* Hide less important table columns on mobile */
+  .col-hide-mobile { display: none !important; }
+
+  /* Cards full width */
+  .card-row { flex-direction: column !important; }
+
+  /* Sticky result goes below on mobile */
+  .sticky-result { position: static !important; }
+}
+
+@media (max-width: 480px) {
+  .rg-3-cols { grid-template-columns: 1fr 1fr !important; }
+}
+
+/* ── Mobile responsive ─────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Main content padding on mobile (hamburger offset) */
+  main > div { padding-top: 60px !important; padding-left: 16px !important; padding-right: 16px !important; }
+
+  /* Stats grid: 2 columns on mobile */
+  .tv-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Two-col grids collapse to 1 */
+  .tv-grid-2 { grid-template-columns: 1fr !important; }
+
+  /* Estimate: single column */
+  .tv-estimate-layout { grid-template-columns: 1fr !important; }
+
+  /* Category tabs wrap */
+  .tv-cat-tabs { flex-wrap: wrap !important; }
+
+  /* Tables: horizontal scroll */
+  .tv-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Cards padding smaller */
+  .tv-card-pad { padding: 14px !important; }
+
+  /* Hide less important columns in tables on mobile */
+  .tv-col-hide-mobile { display: none !important; }
+
+  /* Team stats grid */
+  .tv-team-kpi { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+@media (max-width: 480px) {
+  .tv-stats-grid { grid-template-columns: 1fr !important; }
+  .tv-team-kpi { grid-template-columns: 1fr !important; }
+  main > div { padding-left: 12px !important; padding-right: 12px !important; }
+}
