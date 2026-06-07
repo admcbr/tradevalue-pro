@@ -24,7 +24,7 @@ export default function DashboardPage() {
             .from('estimations').select('*')
             .eq('company_id', userRecord.company_id)
             .order('created_at', { ascending: false })
-          if (est) { setEstimations(est as any); return }
+          if (est) { setEstimations(est as any); localStorage.removeItem('tv_estimations'); return }
         }
       }
       setEstimations(getAllEstimations())

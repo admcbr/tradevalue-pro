@@ -111,10 +111,10 @@ export default function SupportPage() {
   const T = content[lang as 'uk' | 'ru']
 
   const contacts = [
-    { icon: <MessageCircle size={20} color={C.accent} />, label: 'Telegram', value: '@tradevalue_support', link: 'https://t.me/tradevalue_support', color: C.accent },
-    { icon: <Mail size={20} color={C.success} />, label: 'Email', value: 'support@tradevalue.pro', link: 'mailto:support@tradevalue.pro', color: C.success },
-    { icon: <Phone size={20} color={C.warning} />, label: isUk ? 'Телефон' : 'Телефон', value: '+380 44 000 00 00', link: 'tel:+380440000000', color: C.warning },
-    { icon: <Globe size={20} color={C.muted} />, label: isUk ? 'Сайт' : 'Сайт', value: 'tradevalue.pro', link: '/', color: C.muted },
+    { icon: <MessageCircle size={20} color={C.accent} />, label: 'Telegram', value: '@manager_vn', link: 'https://t.me/manager_vn', color: C.accent },
+    { icon: <Mail size={20} color={C.success} />, label: 'Email', value: isUk ? 'Поки не доступно' : 'Пока недоступно', link: '#', color: C.success },
+    { icon: <Phone size={20} color={C.warning} />, label: isUk ? 'Телефон' : 'Телефон', value: '+380 68 474 97 19', link: 'tel:+380684749719', color: C.warning },
+    { icon: <Globe size={20} color={C.muted} />, label: isUk ? 'Сайт' : 'Сайт', value: 'tradevp.com', link: 'https://tradevp.com', color: C.muted },
   ]
 
   function handleSubmit(e: React.FormEvent) {

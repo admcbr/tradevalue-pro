@@ -38,7 +38,7 @@ export default function HistoryPage() {
           .select('*')
           .eq('company_id', userRecord.company_id)
           .order('created_at', { ascending: false })
-        if (estimations) { setData(estimations); setLoading(false); return }
+        if (estimations) { setData(estimations); localStorage.removeItem('tv_estimations'); setLoading(false); return }
       }
     }
 

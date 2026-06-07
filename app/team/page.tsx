@@ -90,26 +90,7 @@ const PERM_LABELS_DATA = [
   { key: 'can_manage_categories' as keyof Permissions,labelUk: 'Керування категоріями',      labelRu: 'Управление категориями',     descUk: 'Може додавати/редагувати категорії',    descRu: 'Может добавлять/редактировать категории' },
 ]
 
-const INITIAL_TEAM: Member[] = [
-  {
-    id: '1', name: 'Андрій Коваль', email: 'a.koval@shop.ua',
-    phone: '+380 67 123 45 67', address: 'м. Київ, вул. Хрещатик 1',
-    role: 'owner', initials: 'АК', gradient: GRADIENTS[0],
-    permissions: DEFAULT_PERMS.owner,
-  },
-  {
-    id: '2', name: 'Іван Сидоренко', email: 'i.sydorenko@shop.ua',
-    phone: '+380 50 234 56 78', address: 'м. Київ, пр. Перемоги 12',
-    role: 'manager', initials: 'ІС', gradient: GRADIENTS[1],
-    permissions: DEFAULT_PERMS.manager,
-  },
-  {
-    id: '3', name: 'Марія Коваленко', email: 'm.kovalenko@shop.ua',
-    phone: '+380 93 345 67 89', address: 'м. Київ, вул. Лесі Українки 5',
-    role: 'manager', initials: 'МК', gradient: GRADIENTS[2],
-    permissions: DEFAULT_PERMS.manager,
-  },
-]
+const INITIAL_TEAM: Member[] = []
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function TeamPage() {
