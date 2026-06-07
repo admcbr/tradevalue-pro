@@ -46,9 +46,8 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse
   }
 
-  // 3. Landing page — public, but redirect logged-in users to dashboard
+  // 3. Landing page — always public, never redirect
   if (path === '/') {
-    if (user) return NextResponse.redirect(new URL('/dashboard', request.url))
     return supabaseResponse
   }
 

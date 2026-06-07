@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase'
 import {
   ArrowRight, CheckCircle, X, Star, Menu, XIcon,
   Zap, Shield, BarChart2, Users, Package, Globe,
@@ -202,6 +203,14 @@ const STATS = [
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function LandingPage() {
   const [mobileMenu, setMobileMenu] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsLoggedIn(!!session)
+    })
+  }, [])
   const [annual, setAnnual] = useState(false)
   const [openFaq, setOpenFaq] = useState<number | null>(null)
 
@@ -251,12 +260,20 @@ export default function LandingPage() {
           </div>
 
           <div style={{ display: 'flex', gap: 10 }} className="tv-landing-nav">
-            <Link href="/auth/login" style={{ padding: '9px 20px', borderRadius: 10, border: `1px solid ${C.border2}`, color: C.muted, textDecoration: 'none', fontSize: 14, fontWeight: 600 }}>
-              Увійти
-            </Link>
-            <Link href="/auth/register" style={{ padding: '9px 20px', borderRadius: 10, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', color: '#fff', textDecoration: 'none', fontSize: 14, fontWeight: 700, boxShadow: '0 0 20px rgba(99,102,241,0.35)' }}>
-              Спробувати безкоштовно
-            </Link>
+            {isLoggedIn ? (
+              <Link href="/dashboard" style={{ padding: '9px 20px', borderRadius: 10, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', color: '#fff', textDecoration: 'none', fontSize: 14, fontWeight: 700, boxShadow: '0 0 20px rgba(99,102,241,0.35)' }}>
+                Перейти в дашборд →
+              </Link>
+            ) : (
+              <>
+                <Link href="/auth/login" style={{ padding: '9px 20px', borderRadius: 10, border: `1px solid ${C.border2}`, color: C.muted, textDecoration: 'none', fontSize: 14, fontWeight: 600 }}>
+                  Увійти
+                </Link>
+                <Link href="/auth/register" style={{ padding: '9px 20px', borderRadius: 10, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', color: '#fff', textDecoration: 'none', fontSize: 14, fontWeight: 700, boxShadow: '0 0 20px rgba(99,102,241,0.35)' }}>
+                  Спробувати безкоштовно
+                </Link>
+              </>
+            )}
           </div>
 
           <button onClick={() => setMobileMenu(!mobileMenu)} className="tv-landing-hamburger"
