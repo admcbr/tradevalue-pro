@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { TrendingUp, Package, Percent, XCircle } from 'lucide-react'
 import { Card, SectionLabel, StatCard } from '@/components/ui'
 import { getAllEstimations } from '@/lib/store'
+import { createClient } from '@/lib/supabase'
 import { formatMoney, STATUS_LABELS } from '@/lib/engine'
 import { useLang } from '@/lib/i18n'
 import type { Estimation } from '@/lib/types'
@@ -12,7 +13,24 @@ const C = { text:'#EDEDF0', muted:'#8080AA', muted2:'#4A4A70', accent:'#6382FF',
 export default function DashboardPage() {
   const { t } = useLang()
   const [estimations, setEstimations] = useState<Estimation[]>([])
-  useEffect(() => { setEstimations(getAllEstimations()) }, [])
+  useEffect(() => {
+    async function load() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: userRecord } = await supabase.from('users').select('company_id, name').eq('id', user.id).single()
+        if (userRecord?.company_id) {
+          const { data: est } = await supabase
+            .from('estimations').select('*')
+            .eq('company_id', userRecord.company_id)
+            .order('created_at', { ascending: false })
+          if (est) { setEstimations(est as any); return }
+        }
+      }
+      setEstimations(getAllEstimations())
+    }
+    load()
+  }, [])
 
   const valid = estimations.filter(e => e.status !== 'not_evaluated')
   const rejected = estimations.filter(e => e.status === 'not_evaluated')

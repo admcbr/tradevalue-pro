@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { useLang } from '@/lib/i18n'
 import { Save } from 'lucide-react'
 import { Card, SectionLabel } from '@/components/ui'
-import { getAllCategories } from '@/lib/store'
+import { getAllCategories, saveCategory } from '@/lib/store'
+import { genId } from '@/lib/store'
 
 const C = {
   card: '#0E0E16', card2: '#141422', border: '#1E1E30', border2: '#282840',
@@ -46,13 +47,81 @@ export default function RulesPage() {
   const [tradeInPercent, setTradeInPercent] = useState(5)
   const [tradeInFixed, setTradeInFixed] = useState(1500)
   const [tradeInEnabled, setTradeInEnabled] = useState(true)
-  const [complRows, setComplRows] = useState([
-    { key:'charger',  labelUk:'Без зарядного пристрою', labelRu:'Без зарядного устройства', value:800,  isBonus:false, enabled:true },
-    { key:'box',      labelUk:'Без коробки',             labelRu:'Без коробки',               value:300,  isBonus:false, enabled:true },
-    { key:'docs',     labelUk:'Без документів',          labelRu:'Без документов',             value:200,  isBonus:false, enabled:true },
-    { key:'warranty', labelUk:'Є гарантія',              labelRu:'Есть гарантия',              value:500,  isBonus:true,  enabled:true },
-    { key:'bag',      labelUk:'Є сумка',                 labelRu:'Есть сумка',                 value:300,  isBonus:true,  enabled:true },
-  ])
+  // Client view settings — stored in localStorage
+  const [clientView, setClientView] = useState(() => {
+    if (typeof window === 'undefined') return {
+      show_device_name: true, show_market_price: true, show_buy_price: true,
+      show_explanation: true, show_condition: true, show_completeness: true,
+      show_sell_price: false, show_profit: false, show_profitability: false,
+      buy_price_label_uk: 'Наша пропозиція', buy_price_label_ru: 'Наше предложение',
+    }
+    try {
+      const saved = localStorage.getItem('tv_client_view')
+      return saved ? JSON.parse(saved) : {
+        show_device_name: true, show_market_price: true, show_buy_price: true,
+        show_explanation: true, show_condition: true, show_completeness: true,
+        show_sell_price: false, show_profit: false, show_profitability: false,
+        buy_price_label_uk: 'Наша пропозиція', buy_price_label_ru: 'Наше предложение',
+      }
+    } catch { return {
+      show_device_name: true, show_market_price: true, show_buy_price: true,
+      show_explanation: true, show_condition: true, show_completeness: true,
+      show_sell_price: false, show_profit: false, show_profitability: false,
+      buy_price_label_uk: 'Наша пропозиція', buy_price_label_ru: 'Наше предложение',
+    }}
+  })
+
+  function updateClientView(key: string, val: any) {
+    setClientView((prev: any) => {
+      const next = { ...prev, [key]: val }
+      localStorage.setItem('tv_client_view', JSON.stringify(next))
+      return next
+    })
+  }
+
+  const [selectedCatId, setSelectedCatId] = useState<string>('')
+  const [allCategories, setAllCategories] = useState<any[]>([])
+  const [newComplName, setNewComplName] = useState('')
+  const [newComplValue, setNewComplValue] = useState('0')
+  const [newComplIsBonus, setNewComplIsBonus] = useState(false)
+
+  useEffect(() => {
+    const cats = getAllCategories()
+    setAllCategories(cats)
+    if (cats.length > 0 && !selectedCatId) setSelectedCatId(cats[0].id)
+  }, [])
+
+  const selectedCat = allCategories.find(c => c.id === selectedCatId)
+  const complRows = selectedCat?.completeness || []
+
+  function updateCompl(itemId: string, patch: any) {
+    if (!selectedCat) return
+    const updated = { ...selectedCat, completeness: selectedCat.completeness.map((ci: any) => ci.id === itemId ? { ...ci, ...patch } : ci) }
+    saveCategory(updated)
+    setAllCategories(prev => prev.map(c => c.id === selectedCatId ? updated : c))
+  }
+
+  function removeCompl(itemId: string) {
+    if (!selectedCat) return
+    const updated = { ...selectedCat, completeness: selectedCat.completeness.filter((ci: any) => ci.id !== itemId) }
+    saveCategory(updated)
+    setAllCategories(prev => prev.map(c => c.id === selectedCatId ? updated : c))
+  }
+
+  function addCompl() {
+    if (!newComplName.trim() || !selectedCat) return
+    const newItem = {
+      id: 'ci_' + genId(), category_id: selectedCatId,
+      name: newComplName.trim(),
+      impact_type: newComplIsBonus ? 'add_amount' : 'sub_amount',
+      impact_value: parseFloat(newComplValue) || 0,
+      block_estimation: false, is_active: true, sort_order: complRows.length,
+    }
+    const updated = { ...selectedCat, completeness: [...selectedCat.completeness, newItem] }
+    saveCategory(updated)
+    setAllCategories(prev => prev.map(c => c.id === selectedCatId ? updated : c))
+    setNewComplName(''); setNewComplValue('0'); setNewComplIsBonus(false)
+  }
 
   useEffect(() => {
     const cats = getAllCategories()
@@ -238,41 +307,198 @@ export default function RulesPage() {
         ))}
       </Card>
 
-      {/* Completeness */}
+      {/* Completeness — per category */}
       <Card style={{ padding:24, marginBottom:28 }}>
-        <SectionLabel>{complImpactLabel}</SectionLabel>
-        <p style={{ fontSize:12, color:C.muted2, marginBottom:16, marginTop:-8 }}>{complSubLabel}</p>
-        {complRows.map(r => (
-          <div key={r.key} style={{ display:'flex', alignItems:'center', padding:'13px 0', borderBottom:'1px solid rgba(255,255,255,0.04)', opacity: r.enabled ? 1 : 0.4, transition:'opacity 0.2s' }}>
-            <button onClick={() => setComplRows(rows => rows.map(x => x.key===r.key ? { ...x, enabled:!x.enabled } : x))} style={{
-              width:38, height:22, borderRadius:99, border:'none', cursor:'pointer', position:'relative', flexShrink:0,
-              background: r.enabled ? (r.isBonus ? 'rgba(52,217,138,0.8)' : 'rgba(99,130,255,0.8)') : C.border2,
-              marginRight:14, transition:'background 0.2s',
-            }}>
-              <div style={{ width:16, height:16, borderRadius:'50%', background:'#fff', position:'absolute', top:3, left: r.enabled ? 19 : 3, transition:'left 0.2s', boxShadow:'0 1px 3px rgba(0,0,0,0.3)' }} />
-            </button>
-            <span style={{ fontSize:13, fontWeight:600, flex:1, color: r.enabled ? C.text : C.muted }}>{isUk ? r.labelUk : r.labelRu}</span>
-            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-              <span style={{ fontSize:12, color:C.muted2 }}>{r.isBonus ? '+' : '−'}</span>
-              <input type="number" disabled={!r.enabled} value={r.value}
-                onChange={e => setComplRows(rows => rows.map(x => x.key===r.key ? { ...x, value:parseInt(e.target.value)||0 } : x))}
-                style={{ width:80, padding:'7px 10px', borderRadius:8, textAlign:'right' as const, fontSize:13, fontWeight:700, fontFamily:'inherit', color: r.enabled ? (r.isBonus ? C.success : C.danger) : C.muted2, background:C.card2, border:`1px solid ${C.border2}`, outline:'none' }} />
-              <span style={{ fontSize:12, color:C.muted2, width:16 }}>₴</span>
-            </div>
-            <div style={{ marginLeft:12, fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:6, width:60, textAlign:'center' as const,
-              background: r.enabled ? (r.isBonus ? 'rgba(52,217,138,0.1)' : 'rgba(99,130,255,0.1)') : 'rgba(255,255,255,0.04)',
-              color: r.enabled ? (r.isBonus ? C.success : C.accent) : C.muted2,
-            }}>
-              {r.enabled ? enabledToggleLabel : disabledToggleLabel}
-            </div>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:18 }}>
+          <div>
+            <SectionLabel style={{ marginBottom:4 }}>{complImpactLabel}</SectionLabel>
+            <p style={{ fontSize:12, color:C.muted2 }}>{isUk ? 'Окрема комплектація для кожної категорії' : 'Отдельная комплектация для каждой категории'}</p>
           </div>
-        ))}
-        <div style={{ marginTop:16, padding:'12px 16px', borderRadius:10, background:'rgba(0,0,0,0.2)', border:`1px solid ${C.border2}` }}>
-          <p style={{ fontSize:11, fontWeight:700, color:C.muted2, textTransform:'uppercase', letterSpacing:'0.6px', marginBottom:8 }}>{activeRulesLabel}</p>
-          <div style={{ display:'flex', gap:16, flexWrap:'wrap' }}>
-            <span style={{ fontSize:12, color:C.muted }}>{enabledCountLabel}: <strong style={{ color:C.text }}>{complRows.filter(r=>r.enabled).length}</strong> {ofLabel} {complRows.length}</span>
-            <span style={{ fontSize:12, color:C.muted }}>{maxDiscountLabel}: <strong style={{ color:C.danger }}>−{complRows.filter(r=>r.enabled&&!r.isBonus).reduce((s,r)=>s+r.value,0).toLocaleString('uk-UA')} ₴</strong></span>
-            <span style={{ fontSize:12, color:C.muted }}>{maxBonusLabel}: <strong style={{ color:C.success }}>+{complRows.filter(r=>r.enabled&&r.isBonus).reduce((s,r)=>s+r.value,0).toLocaleString('uk-UA')} ₴</strong></span>
+        </div>
+
+        {/* Category selector */}
+        <div style={{ marginBottom:20 }}>
+          <p style={{ fontSize:11, fontWeight:700, color:C.muted2, textTransform:'uppercase', letterSpacing:'0.7px', marginBottom:8 }}>{isUk ? 'Категорія' : 'Категория'}</p>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+            {allCategories.map(cat => (
+              <button key={cat.id} onClick={() => setSelectedCatId(cat.id)} style={{
+                padding:'8px 14px', borderRadius:9, cursor:'pointer', fontFamily:'inherit',
+                border:`1px solid ${selectedCatId===cat.id ? 'rgba(99,130,255,0.4)' : C.border2}`,
+                background: selectedCatId===cat.id ? 'rgba(99,130,255,0.12)' : C.card2,
+                color: selectedCatId===cat.id ? C.text : C.muted,
+                fontSize:13, fontWeight:600, display:'flex', alignItems:'center', gap:6,
+              }}>
+                <span>{cat.icon}</span> {cat.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Existing items */}
+        {complRows.length === 0 ? (
+          <div style={{ textAlign:'center', padding:'20px 0', color:C.muted2 }}>
+            <p style={{ fontSize:13 }}>{isUk ? 'Немає пунктів комплектності. Додайте нижче.' : 'Нет пунктов комплектации. Добавьте ниже.'}</p>
+          </div>
+        ) : (
+          <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:16 }}>
+            {complRows.map((r: any) => {
+              const isBonus = r.impact_type === 'add_amount' || r.impact_type === 'add_percent'
+              const val = r.impact_value || 0
+              return (
+                <div key={r.id} style={{ display:'flex', alignItems:'center', padding:'12px 14px', borderRadius:11, background: r.is_active ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.01)', border:`1px solid ${r.is_active ? C.border2 : 'rgba(255,255,255,0.03)'}`, opacity: r.is_active ? 1 : 0.5, gap:12, transition:'all 0.15s' }}>
+                  {/* Toggle */}
+                  <button onClick={() => updateCompl(r.id, { is_active: !r.is_active })} style={{
+                    width:38, height:22, borderRadius:99, border:'none', cursor:'pointer', position:'relative', flexShrink:0,
+                    background: r.is_active ? (isBonus ? 'rgba(52,217,138,0.8)' : 'rgba(99,130,255,0.8)') : C.border2,
+                    transition:'background 0.2s',
+                  }}>
+                    <div style={{ width:16, height:16, borderRadius:'50%', background:'#fff', position:'absolute', top:3, left: r.is_active ? 19 : 3, transition:'left 0.2s', boxShadow:'0 1px 3px rgba(0,0,0,0.3)' }} />
+                  </button>
+
+                  {/* Name — editable */}
+                  <input
+                    value={r.name}
+                    onChange={e => updateCompl(r.id, { name: e.target.value })}
+                    style={{ flex:1, background:'transparent', border:'none', outline:'none', fontSize:13, fontWeight:600, color: r.is_active ? C.text : C.muted, fontFamily:'inherit', cursor:'text' }}
+                  />
+
+                  {/* Type toggle */}
+                  <button onClick={() => updateCompl(r.id, { impact_type: isBonus ? 'sub_amount' : 'add_amount' })}
+                    style={{ padding:'4px 10px', borderRadius:7, border:`1px solid ${isBonus ? 'rgba(52,217,138,0.25)' : 'rgba(99,130,255,0.25)'}`, background: isBonus ? 'rgba(52,217,138,0.08)' : 'rgba(99,130,255,0.08)', color: isBonus ? C.success : C.accent, fontFamily:'inherit', fontSize:12, fontWeight:700, cursor:'pointer', flexShrink:0 }}>
+                    {isBonus ? '+' : '−'}
+                  </button>
+
+                  {/* Value */}
+                  <input type="number" value={val}
+                    onChange={e => updateCompl(r.id, { impact_value: parseFloat(e.target.value)||0 })}
+                    style={{ width:75, padding:'6px 8px', borderRadius:8, textAlign:'right' as const, fontSize:13, fontWeight:700, fontFamily:'inherit', color: isBonus ? C.success : C.danger, background:C.card2, border:`1px solid ${C.border2}`, outline:'none' }} />
+                  <span style={{ fontSize:12, color:C.muted2, flexShrink:0 }}>₴</span>
+
+                  {/* Delete */}
+                  <button onClick={() => removeCompl(r.id)}
+                    style={{ background:'none', border:'none', cursor:'pointer', color:C.muted2, padding:'4px', borderRadius:6, flexShrink:0, fontSize:16, lineHeight:1 }}>×</button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Add new item */}
+        <div style={{ padding:'16px', borderRadius:12, background:'rgba(99,130,255,0.04)', border:`1px dashed rgba(99,130,255,0.2)` }}>
+          <p style={{ fontSize:11, fontWeight:700, color:C.muted2, textTransform:'uppercase', letterSpacing:'0.7px', marginBottom:10 }}>
+            {isUk ? '+ Новий пункт' : '+ Новый пункт'}
+          </p>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'flex-end' }}>
+            <div style={{ flex:1, minWidth:150 }}>
+              <p style={{ fontSize:11, color:C.muted2, marginBottom:5 }}>{isUk ? 'Назва' : 'Название'}</p>
+              <input value={newComplName} onChange={e => setNewComplName(e.target.value)}
+                onKeyDown={e => e.key==='Enter' && addCompl()}
+                placeholder={isUk ? 'напр. Кабель живлення' : 'напр. Кабель питания'}
+                style={{ width:'100%', padding:'9px 12px', borderRadius:9, background:C.card2, border:`1px solid ${C.border2}`, color:C.text, fontFamily:'inherit', fontSize:13, outline:'none' }} />
+            </div>
+            <div>
+              <p style={{ fontSize:11, color:C.muted2, marginBottom:5 }}>{isUk ? 'Тип' : 'Тип'}</p>
+              <div style={{ display:'flex', gap:6 }}>
+                {[
+                  { val:false, label: isUk?'Штраф':'Штраф', color:C.accent },
+                  { val:true,  label: isUk?'Бонус':'Бонус',  color:C.success },
+                ].map(opt => (
+                  <button key={String(opt.val)} onClick={() => setNewComplIsBonus(opt.val)}
+                    style={{ padding:'9px 14px', borderRadius:9, border:`1px solid ${newComplIsBonus===opt.val ? opt.color+'55' : C.border2}`, background: newComplIsBonus===opt.val ? opt.color+'15' : C.card2, color: newComplIsBonus===opt.val ? opt.color : C.muted, fontFamily:'inherit', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+                    {opt.val ? '+' : '−'} {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p style={{ fontSize:11, color:C.muted2, marginBottom:5 }}>{isUk ? 'Сума (₴)' : 'Сумма (₴)'}</p>
+              <input type="number" value={newComplValue} onChange={e => setNewComplValue(e.target.value)}
+                style={{ width:90, padding:'9px 12px', borderRadius:9, background:C.card2, border:`1px solid ${C.border2}`, color:C.text, fontFamily:'inherit', fontSize:13, outline:'none', textAlign:'right' as const }} />
+            </div>
+            <button onClick={addCompl} disabled={!newComplName.trim()} style={{
+              padding:'9px 18px', borderRadius:9, border:'none',
+              background: newComplName.trim() ? 'linear-gradient(135deg,#6382FF,#A78BFA)' : C.border2,
+              color: newComplName.trim() ? '#fff' : C.muted2,
+              fontFamily:'inherit', fontSize:13, fontWeight:700, cursor: newComplName.trim() ? 'pointer' : 'default',
+              boxShadow: newComplName.trim() ? '0 0 16px rgba(99,130,255,0.3)' : 'none',
+            }}>
+              {isUk ? 'Додати' : 'Добавить'}
+            </button>
+          </div>
+        </div>
+
+        {/* Summary */}
+        {complRows.length > 0 && (
+          <div style={{ marginTop:14, padding:'12px 16px', borderRadius:10, background:'rgba(0,0,0,0.2)', border:`1px solid ${C.border2}`, display:'flex', gap:16, flexWrap:'wrap' }}>
+            <span style={{ fontSize:12, color:C.muted }}>{enabledCountLabel}: <strong style={{ color:C.text }}>{complRows.filter((r:any)=>r.is_active).length}</strong> {ofLabel} {complRows.length}</span>
+            <span style={{ fontSize:12, color:C.muted }}>{maxDiscountLabel}: <strong style={{ color:C.danger }}>−{complRows.filter((r:any)=>r.is_active&&(r.impact_type==='sub_amount'||r.impact_type==='sub_percent')).reduce((s:number,r:any)=>s+r.impact_value,0).toLocaleString('uk-UA')} ₴</strong></span>
+            <span style={{ fontSize:12, color:C.muted }}>{maxBonusLabel}: <strong style={{ color:C.success }}>+{complRows.filter((r:any)=>r.is_active&&(r.impact_type==='add_amount'||r.impact_type==='add_percent')).reduce((s:number,r:any)=>s+r.impact_value,0).toLocaleString('uk-UA')} ₴</strong></span>
+          </div>
+        )}
+      </Card>
+
+      {/* ── Client View Settings ── */}
+      <Card style={{ padding:24, marginBottom:28, border:'1px solid rgba(99,130,255,0.2)', background:'linear-gradient(135deg,rgba(99,130,255,0.04),transparent)' }}>
+        <div style={{ marginBottom:18 }}>
+          <SectionLabel style={{ marginBottom:4 }}>👁 {isUk ? 'Що бачить клієнт' : 'Что видит клиент'}</SectionLabel>
+          <p style={{ fontSize:12, color:C.muted2 }}>{isUk ? 'Налаштуйте що відображається у вікні оцінки для клієнта' : 'Настройте что отображается в окне оценки для клиента'}</p>
+        </div>
+
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:20 }}>
+          {[
+            { key:'show_device_name',   labelUk:'Назва пристрою',      labelRu:'Название устройства',    always: true },
+            { key:'show_market_price',  labelUk:'Ринкова вартість',     labelRu:'Рыночная стоимость',     always: false },
+            { key:'show_buy_price',     labelUk:'Ціна викупу',          labelRu:'Цена выкупа',            always: true },
+            { key:'show_condition',     labelUk:'Стан пристрою',        labelRu:'Состояние устройства',   always: false },
+            { key:'show_completeness',  labelUk:'Комплектація',         labelRu:'Комплектация',           always: false },
+            { key:'show_explanation',   labelUk:'Пояснення оцінки',     labelRu:'Объяснение оценки',      always: false },
+            { key:'show_sell_price',    labelUk:'Ціна продажу',         labelRu:'Цена продажи',           always: false },
+            { key:'show_profit',        labelUk:'Прибуток',             labelRu:'Прибыль',                always: false },
+            { key:'show_profitability', labelUk:'Рентабельність',       labelRu:'Рентабельность',         always: false },
+          ].map(({ key, labelUk, labelRu, always }) => {
+            const val = (clientView as any)[key]
+            const label = isUk ? labelUk : labelRu
+            const isHarmful = key === 'show_profit' || key === 'show_profitability' || key === 'show_sell_price'
+            return (
+              <div key={key} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 14px', borderRadius:10, background: val ? 'rgba(52,217,138,0.05)' : 'rgba(255,255,255,0.02)', border:`1px solid ${val ? 'rgba(52,217,138,0.15)' : C.border2}` }}>
+                <div>
+                  <p style={{ fontSize:13, fontWeight:600, color:C.text }}>{label}</p>
+                  {isHarmful && <p style={{ fontSize:10, color:C.danger }}>⚠ {isUk ? 'Краще приховати' : 'Лучше скрыть'}</p>}
+                  {always && <p style={{ fontSize:10, color:C.muted2 }}>{isUk ? 'Завжди показується' : 'Всегда показывается'}</p>}
+                </div>
+                <button disabled={always} onClick={() => updateClientView(key, !val)} style={{
+                  width:42, height:24, borderRadius:99, border:'none',
+                  background: val ? C.success : C.border2,
+                  cursor: always ? 'default' : 'pointer',
+                  opacity: always ? 0.5 : 1,
+                  position:'relative', transition:'background 0.2s', flexShrink:0,
+                }}>
+                  <div style={{ width:18, height:18, borderRadius:'50%', background:'#fff', position:'absolute', top:3, left: val ? 21 : 3, transition:'left 0.2s', boxShadow:'0 1px 3px rgba(0,0,0,0.3)' }} />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+
+        <div>
+          <p style={{ fontSize:11, fontWeight:700, color:C.muted2, textTransform:'uppercase', letterSpacing:'0.7px', marginBottom:8 }}>
+            {isUk ? 'Як назвати ціну викупу для клієнта' : 'Как назвать цену выкупа для клиента'}
+          </p>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            <div>
+              <p style={{ fontSize:11, color:C.muted2, marginBottom:5 }}>🇺🇦 Українська</p>
+              <input style={{ width:'100%', padding:'9px 12px', borderRadius:9, background:C.card2, border:`1px solid ${C.border2}`, color:C.text, fontFamily:'inherit', fontSize:13, outline:'none' }}
+                value={(clientView as any).buy_price_label_uk}
+                onChange={e => updateClientView('buy_price_label_uk', e.target.value)}
+                placeholder="Наша пропозиція" />
+            </div>
+            <div>
+              <p style={{ fontSize:11, color:C.muted2, marginBottom:5 }}>🇷🇺 Русский</p>
+              <input style={{ width:'100%', padding:'9px 12px', borderRadius:9, background:C.card2, border:`1px solid ${C.border2}`, color:C.text, fontFamily:'inherit', fontSize:13, outline:'none' }}
+                value={(clientView as any).buy_price_label_ru}
+                onChange={e => updateClientView('buy_price_label_ru', e.target.value)}
+                placeholder="Наше предложение" />
+            </div>
           </div>
         </div>
       </Card>

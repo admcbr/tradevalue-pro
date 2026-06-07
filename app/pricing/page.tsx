@@ -137,7 +137,7 @@ export default function PricingPage() {
       </div>
 
       {/* Current usage bar */}
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 22px', marginBottom: 28, display: 'flex', alignItems: 'center', gap: 20 }}>
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 22px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 20 }}>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{isUk ? 'Оцінок цього місяця' : 'Оценок в этом месяце'}</span>
@@ -150,6 +150,25 @@ export default function PricingPage() {
         <div style={{ fontSize: 12, color: C.muted2, textAlign: 'right', flexShrink: 0 }}>
           {isUk ? 'Оновлення\n1 липня' : 'Обновление\n1 июля'}
         </div>
+      </div>
+
+      {/* Cancel subscription */}
+      <div style={{ marginBottom: 28, display: 'flex', justifyContent: 'flex-end' }}>
+        <button style={{
+          padding: '7px 14px', borderRadius: 8,
+          border: '1px solid rgba(248,113,113,0.2)', background: 'transparent',
+          color: '#F87171', fontFamily: 'inherit', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+        }}
+          onClick={() => {
+            if (window.confirm(isUk
+              ? 'Ви впевнені що хочете скасувати підписку? Поточний план буде активний до кінця оплаченого періоду.'
+              : 'Вы уверены что хотите отменить подписку? Текущий план будет активен до конца оплаченного периода.'
+            )) {
+              alert(isUk ? 'Підписку скасовано. Ваш план залишається активним до кінця поточного циклу.' : 'Подписка отменена. Ваш план остаётся активным до конца текущего цикла.')
+            }
+          }}>
+          {isUk ? 'Скасувати підписку' : 'Отменить подписку'}
+        </button>
       </div>
 
       {/* Billing toggle */}
@@ -304,9 +323,9 @@ export default function PricingPage() {
           <p style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{isUk ? 'Потрібен індивідуальний тариф?' : 'Нужен индивидуальный тариф?'}</p>
           <p style={{ fontSize: 13, color: C.muted }}>{isUk ? 'Для мережей від 3 точок або великих об\'ємів — напишіть нам' : 'Для сетей от 3 точек или больших объемов — напишите нам'}</p>
         </div>
-        <button style={{ padding: '11px 22px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#6382FF,#A78BFA)', color: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+        <a href="/support" style={{ padding: '11px 22px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#6382FF,#A78BFA)', color: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 13, cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}>
           {isUk ? 'Зв\'язатись з нами' : 'Связаться с нами'}
-        </button>
+        </a>
       </div>
     </div>
   )

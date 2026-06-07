@@ -1,7 +1,14 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-const PUBLIC_PATHS = ['/', '/auth/login', '/auth/register', '/auth/callback', '/auth/reset']
+// These paths are always public — no auth needed
+const PUBLIC_PATHS = [
+  '/',
+  '/auth/login',
+  '/auth/register',
+  '/auth/callback',
+  '/auth/reset',
+]
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -26,16 +33,26 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const path = request.nextUrl.pathname
 
-  // Allow public paths
-  if (PUBLIC_PATHS.some(p => path === p || path.startsWith('/auth/'))) {
-    // Redirect logged-in users away from auth pages
-    if (user && (path.startsWith('/auth/login') || path.startsWith('/auth/register'))) {
+  // 1. Admin — has its own OTP auth, always allow
+  if (path.startsWith('/admin')) {
+    return supabaseResponse
+  }
+
+  // 2. Auth pages — allow all, but redirect logged-in users to dashboard
+  if (path.startsWith('/auth/')) {
+    if (user && (path === '/auth/login' || path === '/auth/register')) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
     return supabaseResponse
   }
 
-  // Protect all app routes
+  // 3. Landing page — public, but redirect logged-in users to dashboard
+  if (path === '/') {
+    if (user) return NextResponse.redirect(new URL('/dashboard', request.url))
+    return supabaseResponse
+  }
+
+  // 4. All other routes — require auth
   if (!user) {
     return NextResponse.redirect(new URL('/auth/login', request.url))
   }

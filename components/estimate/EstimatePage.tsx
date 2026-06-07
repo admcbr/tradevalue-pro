@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, ChevronRight, CheckCircle, AlertTriangle, XCircle, Info, Save, Printer, Sparkles, X } from 'lucide-react'
+import { Plus, ChevronRight, CheckCircle, AlertTriangle, XCircle, Info, Save, Printer, Sparkles, X, Eye } from 'lucide-react'
 import { useLang } from '@/lib/i18n'
+import { createClient } from '@/lib/supabase'
 import { getAllCategories, saveCategory, addOptionToField, addFieldToCategory, addCompletenessItem, saveEstimation, genId } from '@/lib/store'
 import { calculate, formatMoney, STATUS_LABELS } from '@/lib/engine'
 import { printInvoice } from '@/lib/print'
@@ -32,6 +33,7 @@ export default function EstimatePage() {
   const [result, setResult] = useState<EstimationResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [savedId, setSavedId] = useState('')
+  const [showClientModal, setShowClientModal] = useState(false)
 
   // Modals
   const [addCatModal, setAddCatModal] = useState(false)
@@ -56,43 +58,65 @@ export default function EstimatePage() {
     setResult(null); setSavedId('')
   }
 
-  function handleCalculate() {
+  async function handleCalculate() {
     if (!activeCat) return
     const price = parseFloat(marketPrice)
-    if (isNaN(price) || price <= 0) { alert('Вкажіть ринкову ціну'); return }
+    if (isNaN(price) || price <= 0) { alert(lang === 'uk' ? 'Вкажіть ринкову ціну' : 'Укажите рыночную цену'); return }
     setLoading(true); setResult(null); setSavedId('')
-    setTimeout(() => {
-      const res = calculate({ category: activeCat, field_values: fieldValues, completeness_present: completeness, market_price: price, eval_type: evalType, tradein_bonus_percent: 5 })
-      setResult(res); setLoading(false)
-    }, 400)
-  }
 
-  function handleSave() {
-    if (!result || !activeCat) return
-    const values: EstimationValue[] = activeCat.fields.map(f => ({
-      field_id: f.id, field_name: f.name,
-      option_id: f.options.find(o => o.name === fieldValues[f.id])?.id,
-      value: fieldValues[f.id] || '',
-    })).filter(v => v.value)
+    // Calculate result
+    const res = calculate({ category: activeCat, field_values: fieldValues, completeness_present: completeness, market_price: price, eval_type: evalType, tradein_bonus_percent: 5 })
+    setResult(res)
 
-    const brand = activeCat.fields.find(f => f.name === 'Бренд' || f.name === 'Виробник')
-    const model = activeCat.fields.find(f => f.name === 'Модель' || f.name === 'Модель GPU' || f.name === 'Назва товару')
+    // Auto-save to Supabase immediately
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: userRecord } = await supabase.from('users').select('id, name, company_id').eq('id', user.id).single()
+        if (userRecord?.company_id) {
+          const brand = activeCat.fields.find((f: any) => f.name === 'Бренд' || f.name === 'Виробник')
+          const model = activeCat.fields.find((f: any) => f.name === 'Модель' || f.name === 'Модель GPU' || f.name === 'Назва товару')
+          const { data: saved, error } = await supabase.from('estimations').insert({
+            company_id: userRecord.company_id,
+            user_id: user.id,
+            category_id: activeCat.id,
+            category_name: activeCat.name,
+            brand_name: brand ? fieldValues[brand.id] : '',
+            model_name: model ? fieldValues[model.id] : '',
+            eval_type: evalType,
+            market_price: price,
+            buy_price: res.buy_price,
+            sell_price: res.sell_price,
+            profit: res.profit,
+            profitability: res.profitability,
+            status: res.status,
+            deal_status: 'estimated',
+            explanation: res.explanation,
+            field_values: fieldValues,
+            completeness_values: completeness,
+            comment,
+          }).select().single()
 
-    const est = {
-      id: genId(), company_id: '1', category_id: activeCat.id, category_name: activeCat.name,
-      user_id: '1', user_name: 'Андрій Коваль', eval_type: evalType,
-      market_price: parseFloat(marketPrice), buy_price: result.buy_price,
-      sell_price: result.sell_price, profit: result.profit, profitability: result.profitability,
-      status: result.status, deal_status: 'estimated' as const,
-      explanation: result.explanation, blocked_reason: result.blocked_reason,
-      values, completeness_values: completeness, comment,
-      brand_name: brand ? fieldValues[brand.id] : '',
-      model_name: model ? fieldValues[model.id] : '',
-      created_at: new Date().toISOString(),
+          if (error?.message?.includes('Plan limit')) {
+            setResult(null)
+            setLoading(false)
+            alert(lang === 'uk'
+  ? '❌ Ліміт оцінок вичерпано на цей місяць. Перейдіть на вищий тариф у розділі «Тарифи».'
+              : '❌ Лимит оценок исчерпан на этот месяц. Перейдите на более высокий тариф в разделе «Тарифы».')
+            return
+          }
+          if (saved) setSavedId(saved.id)
+        }
+      }
+    } catch(e) {
+      // Supabase not configured — continue without saving
     }
-    saveEstimation(est as any)
-    setSavedId(est.id)
+
+    setLoading(false)
   }
+
+  // handleSave removed — auto-save on Calculate now
 
   function handlePrint() {
     if (!result || !activeCat) return
@@ -302,7 +326,14 @@ export default function EstimatePage() {
                 brandVal={brandVal} modelVal={modelVal}
                 catName={activeCat.name}
                 savedId={savedId}
-                onSave={handleSave} onPrint={handlePrint}
+                onPrint={handlePrint}
+                showClientModal={showClientModal}
+                setShowClientModal={setShowClientModal}
+                lang={lang}
+                activeCat={activeCat}
+                fieldValues={fieldValues}
+                completeness={completeness}
+                comment={comment}
               />
             )}
           </div>
@@ -425,10 +456,12 @@ function BlockedResult({ reason, catName }: { reason: string; catName: string })
   )
 }
 
-function GoodResult({ result, evalType, marketPrice, brandVal, modelVal, catName, savedId, onSave, onPrint }: {
+function GoodResult({ result, evalType, marketPrice, brandVal, modelVal, catName, savedId, onPrint, showClientModal, setShowClientModal, lang, activeCat, fieldValues, completeness, comment }: {
   result: EstimationResult; evalType: EvalType; marketPrice: number
   brandVal: string; modelVal: string; catName: string; savedId: string
-  onSave: () => void; onPrint: () => void
+  onPrint: () => void
+  showClientModal: boolean; setShowClientModal: (v: boolean) => void
+  lang: string; activeCat: any; fieldValues: Record<string,string>; completeness: string[]; comment: string
 }) {
   const [showLiquidity, setShowLiquidity] = useState(false)
   const isGood = result.status === 'good'
@@ -503,25 +536,56 @@ function GoodResult({ result, evalType, marketPrice, brandVal, modelVal, catName
         </button>
         {showLiquidity && brandVal && <LiquidityCard brand={brandVal} model={modelVal} category={catName} marketPrice={marketPrice} condition="" />}
 
-        {/* Actions */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <button onClick={onSave} style={{
-            padding: '11px 16px', borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-            background: savedId ? 'rgba(52,217,138,0.15)' : 'linear-gradient(135deg, #6382FF, #A78BFA)',
-            color: savedId ? '#34D98A' : '#fff', fontWeight: 700, fontSize: 13,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            boxShadow: savedId ? 'none' : '0 0 16px rgba(99,130,255,0.3)',
-          }}>
-            <Save size={13} /> {savedId ? '✓ Збережено' : 'Зберегти'}
-          </button>
-          <button onClick={onPrint} style={{
-            padding: '11px 16px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
-            background: C.card2, border: `1px solid ${C.border2}`, color: C.muted, fontWeight: 600, fontSize: 13,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-          }}>
-            <Printer size={13} /> Накладна
-          </button>
-        </div>
+        {/* Client Modal */}
+        {showClientModal && (
+          <ClientModal
+            result={result}
+            marketPrice={marketPrice}
+            brandVal={brandVal}
+            modelVal={modelVal}
+            catName={catName}
+            evalType={evalType}
+            lang={lang}
+            activeCat={activeCat}
+            fieldValues={fieldValues}
+            completeness={completeness}
+            onClose={() => setShowClientModal(false)}
+            comment={comment}
+          />
+        )}
+
+        {/* Show Client button */}
+        <button onClick={() => setShowClientModal(true)} style={{
+          width:'100%', padding:'11px', borderRadius:10, marginBottom:10,
+          border:'1px solid rgba(99,130,255,0.3)', background:'rgba(99,130,255,0.08)',
+          color:C.accent, fontFamily:'inherit', fontWeight:700, fontSize:13, cursor:'pointer',
+          display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+          transition:'all 0.15s',
+        }}>
+          <Eye size={15}/> {lang === 'ru' ? 'Показать клиенту' : 'Показати клієнту'}
+        </button>
+
+        {/* Auto-saved indicator */}
+        {savedId && (
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'8px', borderRadius:9, background:'rgba(52,217,138,0.08)', border:'1px solid rgba(52,217,138,0.2)', fontSize:12, fontWeight:600, color:'#34D98A' }}>
+            ✓ {lang === 'uk' ? 'Збережено в історію' : 'Сохранено в историю'}
+          </div>
+        )}
+        {savedId && (
+          <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 14px', borderRadius:10, background:'rgba(52,217,138,0.08)', border:'1px solid rgba(52,217,138,0.2)', marginBottom:10 }}>
+            <div style={{ width:7, height:7, borderRadius:'50%', background:'#34D98A', boxShadow:'0 0 6px #34D98A' }} />
+            <p style={{ fontSize:13, fontWeight:600, color:'#34D98A' }}>{lang==='uk' ? '✓ Збережено в історію автоматично' : '✓ Сохранено в историю автоматически'}</p>
+          </div>
+        )}
+
+        {/* Actions — only Print */}
+        <button onClick={onPrint} style={{
+          width:'100%', padding:'11px 16px', borderRadius:10, cursor:'pointer', fontFamily:'inherit',
+          background: C.card2, border:`1px solid ${C.border2}`, color:C.muted, fontWeight:600, fontSize:13,
+          display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+        }}>
+          <Printer size={13} /> {lang==='uk' ? 'Роздрукувати накладну' : 'Распечатать накладную'}
+        </button>
       </div>
     </div>
   )
@@ -694,5 +758,163 @@ function AddComplModal({ categoryId, onClose, onSaved }: { categoryId: string; o
         <button onClick={save} style={{ padding: '11px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#6382FF,#A78BFA)', color: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Додати</button>
       </div>
     </Modal>
+  )
+}
+
+
+// ─── Client Modal ──────────────────────────────────────────────────────────────
+function ClientModal({ result, marketPrice, brandVal, modelVal, catName, evalType, lang, activeCat, fieldValues, completeness, onClose, comment }: {
+  result: EstimationResult; marketPrice: number; brandVal: string; modelVal: string
+  catName: string; evalType: string; lang: string; activeCat: any
+  fieldValues: Record<string,string>; completeness: string[]; onClose: () => void; comment: string
+}) {
+  const isUk = lang === 'uk'
+
+  // Load client view settings
+  const settings = (() => {
+    try {
+      const s = localStorage.getItem('tv_client_view')
+      return s ? JSON.parse(s) : null
+    } catch { return null }
+  })() || {
+    show_device_name: true, show_market_price: true, show_buy_price: true,
+    show_explanation: true, show_condition: true, show_completeness: true,
+    show_sell_price: false, show_profit: false, show_profitability: false,
+    buy_price_label_uk: 'Наша пропозиція', buy_price_label_ru: 'Наше предложение',
+  }
+
+  const buyLabel = isUk ? (settings.buy_price_label_uk || 'Наша пропозиція') : (settings.buy_price_label_ru || 'Наше предложение')
+  const condField = activeCat?.fields?.find((f: any) => f.name === 'Стан')
+  const condVal = condField ? fieldValues[condField.id] : ''
+  const complItems = activeCat?.completeness?.filter((ci: any) => completeness.includes(ci.id)) || []
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center', padding:20, backdropFilter:'blur(4px)' }}
+      onClick={onClose}>
+      <div style={{ background:'#0E0E18', border:'1px solid #2A2A44', borderRadius:22, width:'100%', maxWidth:480, overflow:'hidden', boxShadow:'0 0 80px rgba(0,0,0,0.6)' }}
+        onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ background:'linear-gradient(135deg,rgba(99,102,241,0.15),rgba(16,185,129,0.08))', padding:'24px 28px 20px', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+            <div>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                <div style={{ width:8, height:8, borderRadius:'50%', background:'#10B981', boxShadow:'0 0 8px #10B981' }} />
+                <p style={{ fontSize:11, fontWeight:700, color:'#94A3B8', textTransform:'uppercase', letterSpacing:'1px' }}>
+                  {isUk ? 'Оцінка пристрою' : 'Оценка устройства'}
+                </p>
+              </div>
+              {settings.show_device_name && (
+                <p style={{ fontSize:22, fontWeight:800, color:'#F8FAFC', letterSpacing:-0.5 }}>{brandVal} {modelVal}</p>
+              )}
+              <p style={{ fontSize:13, color:'#475569', marginTop:2 }}>{catName} · {new Date().toLocaleDateString(isUk?'uk-UA':'ru-RU')}</p>
+            </div>
+            <button onClick={onClose} style={{ background:'rgba(255,255,255,0.06)', border:'none', width:32, height:32, borderRadius:9, cursor:'pointer', color:'#94A3B8', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        <div style={{ padding:'20px 28px 28px', display:'flex', flexDirection:'column', gap:12 }}>
+
+          {/* Condition */}
+          {settings.show_condition && condVal && (
+            <div style={{ padding:'12px 16px', borderRadius:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
+              <p style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'0.7px', marginBottom:4 }}>{isUk?'Стан':'Состояние'}</p>
+              <p style={{ fontSize:15, fontWeight:600, color:'#F8FAFC' }}>{condVal}</p>
+            </div>
+          )}
+
+          {/* Completeness */}
+          {settings.show_completeness && complItems.length > 0 && (
+            <div style={{ padding:'12px 16px', borderRadius:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
+              <p style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'0.7px', marginBottom:8 }}>{isUk?'Комплектація':'Комплектация'}</p>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                {complItems.map((ci: any) => (
+                  <span key={ci.id} style={{ padding:'4px 10px', borderRadius:7, background:'rgba(16,185,129,0.1)', border:'1px solid rgba(16,185,129,0.2)', fontSize:12, color:'#10B981', fontWeight:600 }}>✓ {ci.name}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Price cards */}
+          <div style={{ display:'grid', gridTemplateColumns: (settings.show_market_price && settings.show_buy_price) ? '1fr 1fr' : '1fr', gap:10 }}>
+            {settings.show_market_price && (
+              <div style={{ padding:'16px', borderRadius:14, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center' }}>
+                <p style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'0.7px', marginBottom:8 }}>{isUk?'Ринкова вартість':'Рыночная стоимость'}</p>
+                <p style={{ fontSize:26, fontWeight:900, letterSpacing:-1, color:'#94A3B8' }}>{marketPrice.toLocaleString('uk-UA')} ₴</p>
+              </div>
+            )}
+            {settings.show_buy_price && (
+              <div style={{ padding:'16px', borderRadius:14, background:'linear-gradient(135deg,rgba(99,102,241,0.15),rgba(99,102,241,0.05))', border:'1px solid rgba(99,102,241,0.3)', textAlign:'center' }}>
+                <p style={{ fontSize:11, fontWeight:700, color:'#818CF8', textTransform:'uppercase', letterSpacing:'0.7px', marginBottom:8 }}>{buyLabel}</p>
+                <p style={{ fontSize:26, fontWeight:900, letterSpacing:-1, color:'#F8FAFC' }}>{result.buy_price.toLocaleString('uk-UA')} ₴</p>
+              </div>
+            )}
+          </div>
+
+          {/* Optional: sell price, profit, profitability */}
+          {(settings.show_sell_price || settings.show_profit || settings.show_profitability) && (
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(120px,1fr))', gap:8 }}>
+              {settings.show_sell_price && (
+                <div style={{ padding:'12px', borderRadius:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center' }}>
+                  <p style={{ fontSize:10, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'0.6px', marginBottom:4 }}>{isUk?'Ціна продажу':'Цена продажи'}</p>
+                  <p style={{ fontSize:18, fontWeight:800, color:'#10B981' }}>{result.sell_price.toLocaleString('uk-UA')} ₴</p>
+                </div>
+              )}
+              {settings.show_profit && (
+                <div style={{ padding:'12px', borderRadius:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center' }}>
+                  <p style={{ fontSize:10, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'0.6px', marginBottom:4 }}>{isUk?'Прибуток':'Прибыль'}</p>
+                  <p style={{ fontSize:18, fontWeight:800, color:'#F59E0B' }}>{result.profit.toLocaleString('uk-UA')} ₴</p>
+                </div>
+              )}
+              {settings.show_profitability && (
+                <div style={{ padding:'12px', borderRadius:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center' }}>
+                  <p style={{ fontSize:10, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'0.6px', marginBottom:4 }}>{isUk?'Рентабельність':'Рентабельность'}</p>
+                  <p style={{ fontSize:18, fontWeight:800, color:'#F59E0B' }}>{result.profitability}%</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Explanation */}
+          {/* Comment for client */}
+          {comment && (
+            <div style={{ padding:'14px 16px', borderRadius:14, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
+              <p style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'0.7px', marginBottom:6 }}>
+                {isUk?'Коментар':'Комментарий'}
+              </p>
+              <p style={{ fontSize:14, color:'#94A3B8', lineHeight:1.7 }}>{comment}</p>
+            </div>
+          )}
+
+          {/* Explanation — without base rule line */}
+          {settings.show_explanation && result.explanation.length > 0 && (
+            <div style={{ padding:'16px', borderRadius:14, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.05)' }}>
+              <p style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'0.7px', marginBottom:10 }}>
+                {isUk?'Як ми розрахували':'Как мы рассчитали'}
+              </p>
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                {result.explanation
+                  .filter(e => !e.startsWith('⚠'))
+                  .filter(e => !e.toLowerCase().includes('базов') && !e.toLowerCase().includes('базов'))
+                  .filter(e => !e.toLowerCase().includes('базове правило') && !e.toLowerCase().includes('купуємо на') && !e.toLowerCase().includes('покупать ниже'))
+                  .map((exp, i) => (
+                  <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:8 }}>
+                    <div style={{ width:5, height:5, borderRadius:'50%', background:'#6366F1', marginTop:5, flexShrink:0 }} />
+                    <p style={{ fontSize:13, color:'#94A3B8', lineHeight:1.6 }}>{exp}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Close button */}
+          <button onClick={onClose} style={{ padding:'13px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#6366F1,#8B5CF6)', color:'#fff', fontFamily:'inherit', fontWeight:700, fontSize:14, cursor:'pointer', marginTop:4, boxShadow:'0 0 24px rgba(99,102,241,0.3)' }}>
+            {isUk ? 'Закрити' : 'Закрыть'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
