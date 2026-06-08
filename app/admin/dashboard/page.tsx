@@ -95,6 +95,23 @@ export default function AdminDashboard() {
     setUsers(prev => prev.map(u => u.id === id ? { ...u, [field]: value } : u))
   }
 
+  async function deleteUser(id: string, email: string) {
+    if (!window.confirm(`Видалити користувача ${email}? Всі його оцінки залишаться.`)) return
+    // Delete from users table (auth.users deletion requires admin API)
+    await supabase.from('users').delete().eq('id', id)
+    setUsers(prev => prev.filter(u => u.id !== id))
+  }
+
+  async function deleteCompany(id: string, name: string) {
+    if (!window.confirm(`Видалити компанію "${name}"? Будуть видалені всі оцінки і правила цієї компанії!`)) return
+    await supabase.from('estimations').delete().eq('company_id', id)
+    await supabase.from('company_rules').delete().eq('company_id', id)
+    await supabase.from('users').update({ company_id: null }).eq('company_id', id)
+    await supabase.from('companies').delete().eq('id', id)
+    setCompanies(prev => prev.filter(c => c.id !== id))
+    setUsers(prev => prev.map(u => u.company_id === id ? { ...u, company_id: null, company_name: '—' } : u))
+  }
+
   function downloadCompanyCSV(companyId: string, companyName: string) {
     const ests = estimations.filter(e => e.company_id === companyId)
     if (ests.length === 0) { alert('Немає оцінок для цієї компанії'); return }
@@ -296,9 +313,14 @@ export default function AdminDashboard() {
                         </div>
                       </td>
                       <td style={td}>
-                        <button onClick={() => downloadCompanyCSV(c.id, c.name)} title="Скачати оцінки CSV" style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 10px', borderRadius:7, border:`1px solid ${C.border2}`, background:'transparent', color:C.muted, cursor:'pointer', fontSize:11, fontFamily:'inherit' }}>
+                        <div style={{ display:'flex', gap:6 }}>
+                        <button onClick={() => downloadCompanyCSV(c.id, c.name)} title="Скачати CSV" style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 10px', borderRadius:7, border:`1px solid ${C.border2}`, background:'transparent', color:C.muted, cursor:'pointer', fontSize:11, fontFamily:'inherit' }}>
                           <Download size={11}/> CSV
                         </button>
+                        <button onClick={() => deleteCompany(c.id, c.name)} title="Видалити компанію" style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 10px', borderRadius:7, border:'1px solid rgba(239,68,68,0.2)', background:'transparent', color:C.danger, cursor:'pointer', fontSize:11, fontFamily:'inherit' }}>
+                          <X size={11}/> Видалити
+                        </button>
+                      </div>
                       </td>
                     </tr>
                   ))}
@@ -357,9 +379,14 @@ export default function AdminDashboard() {
                       <td style={{ ...td, fontSize:12 }}>{u.company_name}</td>
                       <td style={{ ...td, fontSize:11, color:C.muted2 }}>{new Date(u.created_at).toLocaleDateString('uk-UA')}</td>
                       <td style={td}>
-                        <button onClick={() => downloadCompanyCSV(u.company_id, u.company_name)} title="Скачати оцінки компанії" style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 10px', borderRadius:7, border:`1px solid ${C.border2}`, background:'transparent', color:C.muted, cursor:'pointer', fontSize:11, fontFamily:'inherit' }}>
+                        <div style={{ display:'flex', gap:6 }}>
+                        <button onClick={() => downloadCompanyCSV(u.company_id, u.company_name)} title="Скачати CSV" style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 10px', borderRadius:7, border:`1px solid ${C.border2}`, background:'transparent', color:C.muted, cursor:'pointer', fontSize:11, fontFamily:'inherit' }}>
                           <Download size={11}/> CSV
                         </button>
+                        <button onClick={() => deleteUser(u.id, u.email)} title="Видалити юзера" style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 10px', borderRadius:7, border:'1px solid rgba(239,68,68,0.2)', background:'transparent', color:C.danger, cursor:'pointer', fontSize:11, fontFamily:'inherit' }}>
+                          <X size={11}/> Видалити
+                        </button>
+                      </div>
                       </td>
                     </tr>
                   ))}
