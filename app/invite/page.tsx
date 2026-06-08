@@ -248,9 +248,18 @@ function InvitePageInner() {
                   </button>
                 </div>
               </div>
-              <p style={{ fontSize:13, color:C.muted, background:'rgba(99,102,241,0.06)', border:`1px solid rgba(99,102,241,0.15)`, borderRadius:9, padding:'10px 14px' }}>
-                ℹ️ Акаунт з цим email вже існує. Введіть ваш пароль щоб приєднатись до компанії.
-              </p>
+              <div style={{ padding:'10px 14px', borderRadius:9, background:'rgba(99,102,241,0.06)', border:'1px solid rgba(99,102,241,0.15)', fontSize:13, color:C.muted }}>
+                ℹ️ Акаунт з цим email вже існує. Введіть ваш пароль або{' '}
+                <button type="button" onClick={async () => {
+                  const supabase = createClient()
+                  await supabase.auth.resetPasswordForEmail(invitation.email, {
+                    redirectTo: window.location.href,
+                  })
+                  alert('✓ Лист для скидання пароля надіслано на ' + invitation.email)
+                }} style={{ background:'none', border:'none', cursor:'pointer', color:'#6366F1', fontFamily:'inherit', fontSize:13, fontWeight:700, padding:0, textDecoration:'underline' }}>
+                  скиньте пароль
+                </button>
+              </div>
               <button type="submit" disabled={loading} style={{ padding:'12px', borderRadius:11, border:'none', background:'linear-gradient(135deg,#6366F1,#8B5CF6)', color:'#fff', fontFamily:'inherit', fontWeight:700, fontSize:14, cursor:loading?'not-allowed':'pointer', opacity:loading?0.7:1, boxShadow:'0 0 24px rgba(99,102,241,0.3)', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
                 {loading
                   ? <><span style={{ width:16, height:16, border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'#fff', borderRadius:'50%', animation:'spin .8s linear infinite', display:'inline-block' }} />Входжу...</>
