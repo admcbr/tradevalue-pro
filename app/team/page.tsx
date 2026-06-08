@@ -178,6 +178,8 @@ export default function TeamPage() {
   const [iRole, setIRole] = useState<Role>('manager')
   const [estimations, setEstimations] = useState<any[]>([])
   const [iPassword, setIPassword] = useState('')
+  const [memberPasswords, setMemberPasswords] = useState<Record<string,string>>({})
+  const [savingMember, setSavingMember] = useState<string|null>(null)
   const [showIPassword, setShowIPassword] = useState(false)
 
   useEffect(() => {
@@ -393,13 +395,67 @@ export default function TeamPage() {
                             <div>
                               <span style={{ ...lbl, fontSize: 11 }}>Роль</span>
                               <select style={{ ...f, fontSize: 13, color: C.text, cursor: 'pointer' }} value={member.role}
-                                onChange={e => updateRole(member.id, e.target.value as Role)}>
+                                onChange={async e => {
+                                  const newRole = e.target.value as Role
+                                  updateRole(member.id, newRole)
+                                  // Save role to Supabase via API
+                                  await fetch('/api/admin/update-user', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ userId: member.id, role: newRole }),
+                                  })
+                                }}>
                                 <option value="admin">Admin</option>
                                 <option value="manager">Manager</option>
                                 <option value="viewer">Viewer</option>
                               </select>
                             </div>
                           )}
+
+                          {/* Password change */}
+                          <div>
+                            <span style={{ ...lbl, fontSize: 11 }}>{isUk ? 'Новий пароль' : 'Новый пароль'}</span>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <input
+                                type="password"
+                                placeholder={isUk ? 'Мін. 6 символів' : 'Мин. 6 символов'}
+                                value={memberPasswords[member.id] || ''}
+                                onChange={e => setMemberPasswords(p => ({ ...p, [member.id]: e.target.value }))}
+                                style={{ ...f, fontSize: 13, flex: 1 }}
+                              />
+                              <button
+                                onClick={async () => {
+                                  const pwd = memberPasswords[member.id]
+                                  if (!pwd || pwd.length < 6) {
+                                    alert(isUk ? 'Мінімум 6 символів' : 'Минимум 6 символов')
+                                    return
+                                  }
+                                  setSavingMember(member.id)
+                                  const res = await fetch('/api/admin/update-user', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ userId: member.id, password: pwd }),
+                                  })
+                                  const data = await res.json()
+                                  setSavingMember(null)
+                                  if (data.success) {
+                                    setMemberPasswords(p => ({ ...p, [member.id]: '' }))
+                                    alert(isUk ? '✓ Пароль змінено' : '✓ Пароль изменён')
+                                  } else {
+                                    alert(isUk ? 'Помилка: ' + data.error : 'Ошибка: ' + data.error)
+                                  }
+                                }}
+                                style={{
+                                  padding: '8px 14px', borderRadius: 9, border: 'none',
+                                  background: savingMember === member.id ? C.border2 : 'linear-gradient(135deg,#6382FF,#A78BFA)',
+                                  color: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 12,
+                                  cursor: savingMember === member.id ? 'not-allowed' : 'pointer', flexShrink: 0,
+                                }}
+                              >
+                                {savingMember === member.id ? '...' : (isUk ? 'Зберегти' : 'Сохранить')}
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       </div>
 

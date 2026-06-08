@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createClient } from "@/lib/supabase"
 import { CheckCircle, Zap, Crown, Building2, ArrowRight, X } from 'lucide-react'
 import { useLang } from '@/lib/i18n'
 
@@ -16,7 +17,7 @@ const PLANS = [
   {
     id: 'starter', name: 'Starter', icon: <Zap size={20} color="#8080AA" />,
     priceMonth: 0, priceYear: 0,
-    color: C.muted, highlight: false, current: true,
+    color: C.muted, highlight: false, current: false, // updated dynamically
     desc: { uk: 'Для знайомства з системою', ru: 'Для знакомства с системой' },
     features: {
       uk: [
@@ -118,6 +119,33 @@ const FAQ_RU = [
 export default function PricingPage() {
   const { t, lang } = useLang()
   const [annual, setAnnual] = useState(false)
+  const [usageCount, setUsageCount] = useState(0)
+  const [planLimit, setPlanLimit] = useState(5)
+  const [currentPlan, setCurrentPlan] = useState('starter')
+  const [nextReset, setNextReset] = useState('1 серпня')
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      const { data: ur } = await supabase.from('users').select('company_id').eq('id', user.id).single()
+      if (!ur?.company_id) return
+      const { data: comp } = await supabase.from('companies').select('plan').eq('id', ur.company_id).single()
+      if (comp) {
+        setCurrentPlan(comp.plan || 'starter')
+        setPlanLimit(comp.plan === 'pro' ? 300 : comp.plan === 'business' ? 999999 : 5)
+      }
+      const startOfMonth = new Date()
+      startOfMonth.setDate(1); startOfMonth.setHours(0,0,0,0)
+      const { count } = await supabase.from('estimations')
+        .select('*', { count: 'exact', head: true })
+        .eq('company_id', ur.company_id)
+        .gte('created_at', startOfMonth.toISOString())
+      setUsageCount(count || 0)
+      const next = new Date(); next.setMonth(next.getMonth() + 1); next.setDate(1)
+      setNextReset(next.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' }))
+    })
+  }, [])
   const [selected, setSelected] = useState<string | null>(null)
   const [openFaq, setOpenFaq] = useState<number | null>(null)
 
@@ -132,7 +160,7 @@ export default function PricingPage() {
           {isUk ? 'Тарифні плани' : 'Тарифные планы'}
         </h1>
         <p style={{ fontSize: 14, color: C.muted, marginTop: 4 }}>
-          {isUk ? 'Поточний тариф: Starter (безкоштовно). Використано: 2 / 5 оцінок.' : 'Текущий тариф: Starter (бесплатно). Использовано: 2 / 5 оценок.'}
+          {isUk ? `Поточний тариф: ${currentPlan}. Використано: ${usageCount} / ${planLimit === 999999 ? '∞' : planLimit} оцінок.` : `Текущий тариф: ${currentPlan}. Использовано: ${usageCount} / ${planLimit === 999999 ? '∞' : planLimit} оценок.`}
         </p>
       </div>
 
@@ -141,14 +169,14 @@ export default function PricingPage() {
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{isUk ? 'Оцінок цього місяця' : 'Оценок в этом месяце'}</span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: C.warning }}>2 / 5</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: usageCount >= planLimit ? C.danger : C.warning }}>{usageCount} / {planLimit === 999999 ? '∞' : planLimit}</span>
           </div>
           <div style={{ height: 6, background: C.border2, borderRadius: 99, overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: '40%', background: 'linear-gradient(90deg,#6382FF,#A78BFA)', borderRadius: 99 }} />
+            <div style={{ height: '100%', width: `${Math.min((usageCount / Math.max(planLimit === 999999 ? 999 : planLimit, 1)) * 100, 100)}%`, background: usageCount >= planLimit ? 'linear-gradient(90deg,#F87171,#EF4444)' : 'linear-gradient(90deg,#6382FF,#A78BFA)', borderRadius: 99 }} />
           </div>
         </div>
         <div style={{ fontSize: 12, color: C.muted2, textAlign: 'right', flexShrink: 0 }}>
-          {isUk ? 'Оновлення\n1 липня' : 'Обновление\n1 июля'}
+          {isUk ? `Оновлення ${nextReset}` : `Обновление ${nextReset}`}
         </div>
       </div>
 
