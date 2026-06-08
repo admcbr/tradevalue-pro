@@ -41,6 +41,19 @@ export default function OnboardingPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/auth/login'); return }
 
+    // Check if user already has a company (was added by owner)
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('company_id, role')
+      .eq('id', user.id)
+      .single()
+
+    if (existingUser?.company_id) {
+      // Already in a company — go directly to dashboard
+      router.push('/dashboard')
+      return
+    }
+
     // Create company
     const { data: company, error: cErr } = await supabase
       .from('companies')

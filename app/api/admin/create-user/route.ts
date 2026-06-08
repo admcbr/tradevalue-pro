@@ -15,28 +15,56 @@ export async function POST(request: Request) {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    // Create user in auth.users
-    const { data, error } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true, // auto-confirm email
-      user_metadata: { name },
-    })
+    // Check if user already exists
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers()
+    const existing = existingUsers?.users?.find(u => u.email === email)
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    let userId: string
+
+    if (existing) {
+      // User exists — just update their record
+      userId = existing.id
+      // Update password if needed
+      await supabaseAdmin.auth.admin.updateUserById(userId, { password })
+    } else {
+      // Create new user
+      const { data, error } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { name, role, company_id },
+      })
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+      userId = data.user.id
     }
 
-    // Link to company in public.users
-    await supabaseAdmin.from('users').upsert({
-      id: data.user.id,
-      email,
-      name: name || email.split('@')[0],
-      role: role || 'manager',
-      company_id,
-    })
+    // Wait a bit for trigger to run first
+    await new Promise(r => setTimeout(r, 500))
 
-    return NextResponse.json({ success: true, userId: data.user.id })
+    // Now UPDATE (not insert) the user record with correct role and company
+    const { error: updateError } = await supabaseAdmin
+      .from('users')
+      .update({
+        name: name || email.split('@')[0],
+        role: role || 'manager',
+        company_id,
+      })
+      .eq('id', userId)
+
+    if (updateError) {
+      // Try upsert as fallback
+      await supabaseAdmin.from('users').upsert({
+        id: userId,
+        email,
+        name: name || email.split('@')[0],
+        role: role || 'manager',
+        company_id,
+      })
+    }
+
+    return NextResponse.json({ success: true, userId })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

@@ -180,7 +180,35 @@ export default function TeamPage() {
   const [iPassword, setIPassword] = useState('')
   const [showIPassword, setShowIPassword] = useState(false)
 
-  useEffect(() => { }, [])
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      const { data: userRecord } = await supabase.from('users').select('company_id').eq('id', user.id).single()
+      if (userRecord?.company_id) {
+        setCompanyId(userRecord.company_id)
+        const { data: members } = await supabase
+          .from('users')
+          .select('*')
+          .eq('company_id', userRecord.company_id)
+          .order('created_at')
+        if (members && members.length > 0) {
+          const mapped = members.map((m: any, i: number) => ({
+            id: m.id,
+            name: m.name || m.email,
+            email: m.email,
+            phone: m.phone || '',
+            address: m.address || '',
+            role: m.role || 'manager',
+            initials: (m.name || m.email).split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0,2),
+            gradient: GRADIENTS[i % GRADIENTS.length],
+            permissions: DEFAULT_PERMS[m.role as keyof typeof DEFAULT_PERMS] || DEFAULT_PERMS.manager,
+          }))
+          setTeam(mapped)
+        }
+      }
+    })
+  }, [])
 
   // Per-member stats
   function memberStats(name: string) {

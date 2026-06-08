@@ -31,9 +31,25 @@ export default function LoginPage() {
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true); setError('')
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) { setError(error.message); setLoading(false); return }
-    router.push('/dashboard')
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) { setError(error.message === 'Invalid login credentials' ? 'Невірний email або пароль' : error.message); setLoading(false); return }
+
+    // Check if user has company setup
+    if (data.user) {
+      const { data: userRecord } = await supabase
+        .from('users')
+        .select('company_id')
+        .eq('id', data.user.id)
+        .single()
+
+      if (userRecord?.company_id) {
+        router.push('/dashboard')
+      } else {
+        router.push('/auth/onboarding')
+      }
+    } else {
+      router.push('/dashboard')
+    }
     router.refresh()
   }
 
