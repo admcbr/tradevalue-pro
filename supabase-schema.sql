@@ -241,3 +241,27 @@ $$;
 create trigger enforce_plan_limit
   before insert on public.estimations
   for each row execute procedure public.check_plan_limit();
+
+-- ── Invitations ───────────────────────────────────────────────────────────────
+create table public.invitations (
+  id            uuid primary key default uuid_generate_v4(),
+  company_id    uuid not null references public.companies(id) on delete cascade,
+  invited_by    uuid not null references public.users(id) on delete cascade,
+  email         text not null,
+  role          text not null default 'manager',
+  token         text not null unique default encode(gen_random_bytes(32), 'hex'),
+  accepted      boolean not null default false,
+  created_at    timestamptz default now(),
+  expires_at    timestamptz default now() + interval '7 days'
+);
+
+alter table public.invitations enable row level security;
+
+create policy "inv_read" on public.invitations
+  for select using (company_id = public.my_company_id() or email = (select email from public.users where id = auth.uid()));
+
+create policy "inv_insert" on public.invitations
+  for insert with check (company_id = public.my_company_id() and public.my_role() in ('owner','admin'));
+
+create policy "inv_update" on public.invitations
+  for update using (company_id = public.my_company_id() or email = (select email from public.users where id = auth.uid()));

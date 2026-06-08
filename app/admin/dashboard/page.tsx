@@ -47,7 +47,8 @@ export default function AdminDashboard() {
 
   async function loadData() {
     setLoading(true)
-    const [{ data: comps }, { data: usrs }, { data: ests }] = await Promise.all([
+    // Admin can see all data via admin_* policies in Supabase
+    const [{ data: comps, error: eComps }, { data: usrs, error: eUsrs }, { data: ests }] = await Promise.all([
       supabase.from('companies').select('*').order('created_at', { ascending: false }),
       supabase.from('users').select('*').order('created_at', { ascending: false }),
       supabase.from('estimations').select('*').order('created_at', { ascending: false }),
@@ -63,6 +64,8 @@ export default function AdminDashboard() {
       company_name: (comps||[]).find(c => c.id === u.company_id)?.name || '—',
     }))
 
+    if (eComps) console.error('Companies error:', eComps)
+    if (eUsrs) console.error('Users error:', eUsrs)
     setCompanies(enrichedComps)
     setUsers(enrichedUsers)
     setEstimations(ests||[])

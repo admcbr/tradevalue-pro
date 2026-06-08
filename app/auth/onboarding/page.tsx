@@ -49,8 +49,8 @@ export default function OnboardingPage() {
       .single()
 
     if (cErr) {
-      // Table might not exist yet — just redirect (will be set up with real DB)
-      router.push('/dashboard')
+      setError('Помилка створення компанії: ' + cErr.message)
+      setLoading(false)
       return
     }
 
@@ -76,6 +76,11 @@ export default function OnboardingPage() {
       min_market_price: 2000,
     })
 
+    // Clear any old localStorage data for fresh start
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('tv_estimations')
+      localStorage.removeItem('tv_categories')
+    }
     setLoading(false)
     setStep(3)
     setTimeout(() => router.push('/dashboard'), 2000)

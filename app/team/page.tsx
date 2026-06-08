@@ -1,4 +1,5 @@
 'use client'
+import { createClient } from '@/lib/supabase'
 
 import { useState, useEffect } from 'react'
 import {
@@ -96,7 +97,70 @@ const INITIAL_TEAM: Member[] = []
 export default function TeamPage() {
   const { t } = useLang()
   const [team, setTeam] = useState<Member[]>(INITIAL_TEAM)
+  const [companyId, setCompanyId] = useState<string>('')
+  const [inviteSent, setInviteSent] = useState(false)
+  const [inviteLoading, setInviteLoading] = useState(false)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (user) {
+        const { data } = await supabase.from('users').select('company_id').eq('id', user.id).single()
+        if (data?.company_id) setCompanyId(data.company_id)
+      }
+    })
+  }, [])
+
+  async function handleInvite() {
+    if (!iEmail || !companyId) return
+    setInviteLoading(true)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setInviteLoading(false); return }
+
+    // Create invitation record
+    const { data: inv, error } = await supabase.from('invitations').insert({
+      company_id: companyId,
+      invited_by: user.id,
+      email: iEmail,
+      role: iRole || 'manager',
+    }).select().single()
+
+    if (error) {
+      alert(isUk ? 'Помилка створення запрошення' : 'Ошибка создания приглашения')
+      setInviteLoading(false)
+      return
+    }
+
+    // Show invite link to copy
+    const inviteLink = `${window.location.origin}/invite?token=${inv.token}`
+    const message = isUk
+      ? `Запрошення створено!\n\nНадішліть це посилання менеджеру:\n${inviteLink}\n\nПосилання дійсне 7 днів.`
+      : `Приглашение создано!\n\nОтправьте эту ссылку менеджеру:\n${inviteLink}\n\nСсылка действительна 7 дней.`
+
+    // Copy to clipboard
+    try {
+      await navigator.clipboard.writeText(inviteLink)
+      alert(message + '\n\n✓ Посилання скопійовано в буфер обміну!')
+    } catch {
+      alert(message)
+    }
+
+    // Add to local team list
+    const initials = iName.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2) || '??'
+    const grad = GRADIENTS[team.length % GRADIENTS.length]
+    const member: Member = {
+      id: inv.id, name: iName, email: iEmail, phone: iPhone, address: iAddress, role: iRole,
+      initials, gradient: grad,
+      permissions: DEFAULT_PERMS[iRole as keyof typeof DEFAULT_PERMS] || DEFAULT_PERMS.manager,
+    }
+    setTeam(prev => [...prev, member])
+    setShowInvite(false)
+    setIName(''); setIEmail(''); setIPhone(''); setIAddress(''); setIRole('manager')
+    setInviteLoading(false)
+  }
   const { t: _t, lang } = useLang()
+  const isUk = lang === 'uk'
   const [estimations, setEstimations] = useState<Estimation[]>([])
   const [activeTab, setActiveTab] = useState<'members' | 'stats'>('members')
   const [showInvite, setShowInvite] = useState(false)
@@ -125,19 +189,6 @@ export default function TeamPage() {
     return { total: mine.length, bought: bought.length, totalBuySum, totalProfit, avgProfit, avgPct, rejected, conversionRate }
   }
 
-  function handleInvite() {
-    if (!iName.trim() || !iEmail.trim()) return
-    const words = iName.trim().split(' ')
-    const initials = words.map(w => w[0]).join('').toUpperCase().slice(0, 2)
-    setTeam(t => [...t, {
-      id: String(Date.now()), name: iName.trim(), email: iEmail.trim(),
-      phone: iPhone, address: iAddress, role: iRole, initials,
-      gradient: GRADIENTS[t.length % GRADIENTS.length],
-      permissions: { ...DEFAULT_PERMS[iRole] },
-    }])
-    setIName(''); setIEmail(''); setIPhone(''); setIAddress(''); setIRole('manager')
-    setShowInvite(false)
-  }
 
   function updatePerm(id: string, key: keyof Permissions, val: boolean) {
     setTeam(t => t.map(m => m.id === id ? { ...m, permissions: { ...m.permissions, [key]: val } } : m))
