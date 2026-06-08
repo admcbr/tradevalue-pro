@@ -1,14 +1,13 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-// These paths are always public — no auth needed
-const PUBLIC_PATHS = [
-  '/',
-  '/auth/login',
-  '/auth/register',
-  '/auth/callback',
-  '/auth/reset',
-]
+// Routes that don't need auth
+const PUBLIC_PATHS = ['/', '/auth/login', '/auth/register', '/auth/callback', '/auth/reset', '/invite']
+
+// Routes only for owner/admin
+const OWNER_ADMIN_PATHS = ['/categories', '/rules', '/blocked', '/team', '/pricing']
+// Routes only for owner
+const OWNER_ONLY_PATHS = ['/pricing']
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -33,27 +32,42 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const path = request.nextUrl.pathname
 
-  // 1. Admin — has its own OTP auth, always allow
+  // Admin panel — handles own auth
   if (path.startsWith('/admin')) {
     return supabaseResponse
   }
 
-  // 2. Auth pages — allow all, but redirect logged-in users to dashboard
-  if (path.startsWith('/auth/')) {
-    if (user && (path === '/auth/login' || path === '/auth/register')) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
-    }
+  // Public paths — always accessible
+  if (PUBLIC_PATHS.some(p => path === p || path.startsWith('/auth/'))) {
     return supabaseResponse
   }
 
-  // 3. Landing page — always public, never redirect
-  if (path === '/') {
-    return supabaseResponse
-  }
-
-  // 4. All other routes — require auth
+  // Not logged in — redirect to login
   if (!user) {
     return NextResponse.redirect(new URL('/auth/login', request.url))
+  }
+
+  // Logged in — check role for restricted pages
+  if (OWNER_ADMIN_PATHS.some(p => path.startsWith(p))) {
+    // Get user role from DB
+    const { data: userRecord } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    const role = userRecord?.role || 'manager'
+
+    // Pricing — owner only
+    if (path.startsWith('/pricing') && role !== 'owner') {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+
+    // Categories, rules, blocked, team — owner or admin only
+    const ownerAdminRoutes = ['/categories', '/rules', '/blocked', '/team']
+    if (ownerAdminRoutes.some(r => path.startsWith(r)) && !['owner', 'admin'].includes(role)) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
   }
 
   return supabaseResponse

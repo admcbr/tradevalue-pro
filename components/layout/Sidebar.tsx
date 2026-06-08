@@ -75,15 +75,34 @@ export default function Sidebar() {
   const [userName, setUserName] = useState('...')
   const [userInitials, setUserInitials] = useState('..')
   const [userRole, setUserRole] = useState('')
+  const [userRoleKey, setUserRoleKey] = useState('manager')
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (user) {
-        const name = user.user_metadata?.name || user.email?.split('@')[0] || 'User'
+        // Get real name and role from public.users
+        const { data: userRecord } = await supabase
+          .from('users')
+          .select('name, role')
+          .eq('id', user.id)
+          .single()
+
+        const name = userRecord?.name || user.user_metadata?.name || user.email?.split('@')[0] || 'User'
+        const role = userRecord?.role || 'manager'
+
         setUserName(name)
         setUserInitials(name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2))
-        setUserRole('Owner')
+
+        // Translate role to Ukrainian/Russian
+        const roleLabels: Record<string, string> = {
+          owner: 'Власник',
+          admin: 'Адмін',
+          manager: 'Менеджер',
+          viewer: 'Перегляд',
+        }
+        setUserRole(roleLabels[role] || role)
+        setUserRoleKey(role)
       }
     })
   }, [])
@@ -94,17 +113,25 @@ export default function Sidebar() {
     window.location.href = '/auth/login'
   }
 
-  const navItems = [
-    { label:t.dashboard,    href:'/dashboard',  icon:LayoutDashboard, section:'main' },
-    { label:t.new_estimate, href:'/estimate',   icon:FilePlus,        section:'main' },
-    { label:t.history,      href:'/history',    icon:Clock,           section:'main' },
-    { label:t.categories,   href:'/categories', icon:Layers,          section:'settings' },
-    { label:t.rules,        href:'/rules',      icon:Settings2,       section:'settings' },
-    { label:t.blocked,      href:'/blocked',    icon:Ban,             section:'settings' },
-    { label:t.team,         href:'/team',       icon:Users,           section:'settings' },
-    { label:isUk?'Тарифи':'Тарифы',     href:'/pricing',  icon:CreditCard,        section:'settings' },
-    { label:isUk?'Підтримка':'Поддержка', href:'/support',  icon:HeadphonesIcon,   section:'settings' },
+  const isOwnerOrAdmin = userRoleKey === 'owner' || userRoleKey === 'admin'
+  const isManager = userRoleKey === 'manager'
+  const isViewer = userRoleKey === 'viewer'
+
+  const allNavItems = [
+    { label:t.dashboard,    href:'/dashboard',  icon:LayoutDashboard, section:'main',     roles:['owner','admin','manager','viewer'] },
+    { label:t.new_estimate, href:'/estimate',   icon:FilePlus,        section:'main',     roles:['owner','admin','manager'] },
+    { label:t.history,      href:'/history',    icon:Clock,           section:'main',     roles:['owner','admin','manager','viewer'] },
+    { label:t.categories,   href:'/categories', icon:Layers,          section:'settings', roles:['owner','admin'] },
+    { label:t.rules,        href:'/rules',      icon:Settings2,       section:'settings', roles:['owner','admin'] },
+    { label:t.blocked,      href:'/blocked',    icon:Ban,             section:'settings', roles:['owner','admin'] },
+    { label:t.team,         href:'/team',       icon:Users,           section:'settings', roles:['owner','admin'] },
+    { label:isUk?'Тарифи':'Тарифы',       href:'/pricing',  icon:CreditCard,      section:'settings', roles:['owner'] },
+    { label:isUk?'Підтримка':'Поддержка', href:'/support',  icon:HeadphonesIcon,  section:'settings', roles:['owner','admin','manager','viewer'] },
   ]
+
+  const navItems = allNavItems.filter(item => 
+    !userRoleKey || item.roles.includes(userRoleKey)
+  )
 
   // Fix: apply active state properly
   const navWithActive = navItems.map(i=>({ ...i, active: pathname === i.href }))
