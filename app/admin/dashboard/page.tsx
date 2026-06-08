@@ -96,10 +96,24 @@ export default function AdminDashboard() {
   }
 
   async function deleteUser(id: string, email: string) {
-    if (!window.confirm(`Видалити користувача ${email}? Всі його оцінки залишаться.`)) return
-    // Delete from users table (auth.users deletion requires admin API)
-    await supabase.from('users').delete().eq('id', id)
-    setUsers(prev => prev.filter(u => u.id !== id))
+    if (!window.confirm(`Видалити користувача ${email}?\nЦе видалить акаунт повністю — email буде вільний для повторної реєстрації.`)) return
+    
+    try {
+      const res = await fetch('/api/admin/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: id, adminEmail: ADMIN_EMAIL }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setUsers(prev => prev.filter(u => u.id !== id))
+        alert('✓ Користувача видалено повністю')
+      } else {
+        alert('Помилка: ' + data.error)
+      }
+    } catch (e) {
+      alert('Помилка з\'єднання')
+    }
   }
 
   async function deleteCompany(id: string, name: string) {
