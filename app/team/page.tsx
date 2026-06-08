@@ -95,7 +95,8 @@ const INITIAL_TEAM: Member[] = []
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function TeamPage() {
-  const { t } = useLang()
+  const { t, lang } = useLang()
+  const isUk = lang === 'uk'
   const [team, setTeam] = useState<Member[]>(INITIAL_TEAM)
   const [companyId, setCompanyId] = useState<string>('')
   const [inviteSent, setInviteSent] = useState(false)
@@ -113,55 +114,57 @@ export default function TeamPage() {
 
   async function handleInvite() {
     if (!iEmail || !companyId) return
-    setInviteLoading(true)
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setInviteLoading(false); return }
-
-    // Create invitation record
-    const { data: inv, error } = await supabase.from('invitations').insert({
-      company_id: companyId,
-      invited_by: user.id,
-      email: iEmail,
-      role: iRole || 'manager',
-    }).select().single()
-
-    if (error) {
-      alert(isUk ? 'Помилка створення запрошення' : 'Ошибка создания приглашения')
-      setInviteLoading(false)
+    if (!iPassword || iPassword.length < 6) {
+      alert(isUk ? 'Пароль має бути мінімум 6 символів' : 'Пароль должен быть минимум 6 символов')
       return
     }
+    setInviteLoading(true)
 
-    // Show invite link to copy
-    const inviteLink = `${window.location.origin}/invite?token=${inv.token}`
-    const message = isUk
-      ? `Запрошення створено!\n\nНадішліть це посилання менеджеру:\n${inviteLink}\n\nПосилання дійсне 7 днів.`
-      : `Приглашение создано!\n\nОтправьте эту ссылку менеджеру:\n${inviteLink}\n\nСсылка действительна 7 дней.`
-
-    // Copy to clipboard
     try {
-      await navigator.clipboard.writeText(inviteLink)
-      alert(message + '\n\n✓ Посилання скопійовано в буфер обміну!')
-    } catch {
-      alert(message)
-    }
+      const res = await fetch('/api/admin/create-member', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: iName,
+          email: iEmail,
+          password: iPassword,
+          role: iRole,
+          companyId,
+          phone: iPhone,
+          address: iAddress,
+        }),
+      })
+      const data = await res.json()
 
-    // Add to local team list
-    const initials = iName.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2) || '??'
-    const grad = GRADIENTS[team.length % GRADIENTS.length]
-    const member: Member = {
-      id: inv.id, name: iName, email: iEmail, phone: iPhone, address: iAddress, role: iRole,
-      initials, gradient: grad,
-      permissions: DEFAULT_PERMS[iRole as keyof typeof DEFAULT_PERMS] || DEFAULT_PERMS.manager,
+      if (!data.success) {
+        alert((isUk ? 'Помилка: ' : 'Ошибка: ') + data.error)
+        setInviteLoading(false)
+        return
+      }
+
+      // Add to local team list
+      const initials = iName.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2) || '??'
+      const grad = GRADIENTS[team.length % GRADIENTS.length]
+      const member: Member = {
+        id: data.userId, name: iName, email: iEmail,
+        phone: iPhone, address: iAddress, role: iRole,
+        initials, gradient: grad,
+        permissions: DEFAULT_PERMS[iRole as keyof typeof DEFAULT_PERMS] || DEFAULT_PERMS.manager,
+      }
+      setTeam(prev => [...prev, member])
+      setShowInvite(false)
+      setIName(''); setIEmail(''); setIPhone(''); setIAddress(''); setIRole('manager'); setIPassword('')
+      alert(isUk
+        ? `✓ Менеджер ${iName} створений!\n\nДані для входу:\nEmail: ${iEmail}\nПароль: ${iPassword}\n\nПередайте ці дані менеджеру.`
+        : `✓ Менеджер ${iName} создан!\n\nДанные для входа:\nEmail: ${iEmail}\nПароль: ${iPassword}\n\nПередайте эти данные менеджеру.`
+      )
+    } catch (e) {
+      alert(isUk ? 'Помилка зʼєднання' : 'Ошибка соединения')
     }
-    setTeam(prev => [...prev, member])
-    setShowInvite(false)
-    setIName(''); setIEmail(''); setIPhone(''); setIAddress(''); setIRole('manager')
     setInviteLoading(false)
   }
-  const { t: _t, lang } = useLang()
-  const isUk = lang === 'uk'
-  const [estimations, setEstimations] = useState<Estimation[]>([])
+
+
   const [activeTab, setActiveTab] = useState<'members' | 'stats'>('members')
   const [showInvite, setShowInvite] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -173,8 +176,11 @@ export default function TeamPage() {
   const [iPhone, setIPhone] = useState('')
   const [iAddress, setIAddress] = useState('')
   const [iRole, setIRole] = useState<Role>('manager')
+  const [estimations, setEstimations] = useState<any[]>([])
+  const [iPassword, setIPassword] = useState('')
+  const [showIPassword, setShowIPassword] = useState(false)
 
-  useEffect(() => { setEstimations(getAllEstimations()) }, [])
+  useEffect(() => { }, [])
 
   // Per-member stats
   function memberStats(name: string) {
@@ -258,6 +264,21 @@ export default function TeamPage() {
               </select>
             </div>
             <div style={{ gridColumn: '1/-1' }}><span style={lbl}>Адреса / Відділення</span><input style={f} placeholder="м. Київ, вул. Хрещатик 1" value={iAddress} onChange={e => setIAddress(e.target.value)} /></div>
+            <div style={{ gridColumn: '1/-1' }}>
+              <span style={{ ...lbl, color: '#F87171' }}>Пароль для входу * (мін. 6 символів)</span>
+              <div style={{ position: 'relative' }}>
+                <input style={{ ...f, paddingRight: 44 }} type={showIPassword ? 'text' : 'password'}
+                  placeholder="Придумайте пароль для менеджера"
+                  value={iPassword} onChange={e => setIPassword(e.target.value)} />
+                <button type="button" onClick={() => setShowIPassword(!showIPassword)}
+                  style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: C.muted2, padding: 0 }}>
+                  {showIPassword ? '🙈' : '👁'}
+                </button>
+              </div>
+              <p style={{ fontSize: 11, color: C.muted2, marginTop: 5 }}>
+                {isUk ? 'Після створення — передайте email і пароль менеджеру особисто' : 'После создания — передайте email и пароль менеджеру лично'}
+              </p>
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={handleInvite} style={{ padding: '10px 22px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#6382FF,#A78BFA)', color: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
