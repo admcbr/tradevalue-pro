@@ -227,22 +227,24 @@ export default function TeamPage() {
 
 
   async function updatePerm(id: string, key: keyof Permissions, val: boolean) {
-    // Update local state immediately
-    setTeam(t => t.map(m => m.id === id ? { ...m, permissions: { ...m.permissions, [key]: val } } : m))
-    
-    // Save to Supabase user_permissions table
+    // Get current member permissions BEFORE state update
+    const member = team.find(m => m.id === id)
+    if (!member) return
+
+    // Build new permissions with updated value
+    const newPerms = { ...member.permissions, [key]: val }
+
+    // Update local state
+    setTeam(t => t.map(m => m.id === id ? { ...m, permissions: newPerms } : m))
+
+    // Save to Supabase
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     const { data: ur } = await supabase.from('users').select('company_id').eq('id', user.id).single()
     if (!ur?.company_id) return
 
-    // Get current permissions for this member
-    const member = team.find(m => m.id === id)
-    if (!member) return
-    const newPerms = { ...member.permissions, [key]: val }
-
-    await supabase.from('user_permissions').upsert({
+    const { error } = await supabase.from('user_permissions').upsert({
       user_id: id,
       company_id: ur.company_id,
       see_dashboard: newPerms.see_dashboard,
@@ -253,6 +255,8 @@ export default function TeamPage() {
       can_edit_rules: newPerms.can_edit_rules,
       can_manage_categories: newPerms.can_manage_categories,
     }, { onConflict: 'user_id' })
+
+    if (error) console.error('Permission save error:', error)
   }
 
   function updateRole(id: string, role: Role) {
@@ -442,8 +446,9 @@ export default function TeamPage() {
                             <span style={{ ...lbl, fontSize: 11 }}>{isUk ? 'Новий пароль' : 'Новый пароль'}</span>
                             <div style={{ display: 'flex', gap: 8 }}>
                               <input
-                                type="password"
-                                placeholder={isUk ? 'Мін. 6 символів' : 'Мин. 6 символов'}
+                                type="text"
+                                autoComplete="off"
+                                placeholder={isUk ? 'Новий пароль (мін. 6 символів)' : 'Новый пароль (мин. 6 символов)'}
                                 value={memberPasswords[member.id] || ''}
                                 onChange={e => setMemberPasswords(p => ({ ...p, [member.id]: e.target.value }))}
                                 style={{ ...f, fontSize: 13, flex: 1 }}
