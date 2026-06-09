@@ -180,6 +180,7 @@ export default function TeamPage() {
   const [iPassword, setIPassword] = useState('')
   const [memberPasswords, setMemberPasswords] = useState<Record<string,string>>({})
   const [savingMember, setSavingMember] = useState<string|null>(null)
+  const [permSavedId, setPermSavedId] = useState<string|null>(null)
   const [showIPassword, setShowIPassword] = useState(false)
 
   useEffect(() => {
@@ -232,49 +233,30 @@ export default function TeamPage() {
     const newPerms = { ...member.permissions, [key]: val }
     setTeam(t => t.map(m => m.id === id ? { ...m, permissions: newPerms } : m))
 
+    // Use server API with service role to bypass RLS
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { console.error('No user'); return }
-
+    if (!user) return
     const { data: ur } = await supabase.from('users').select('company_id').eq('id', user.id).single()
-    if (!ur?.company_id) { console.error('No company_id for user'); return }
+    if (!ur?.company_id) return
 
-    const payload = {
-      user_id: id,
-      company_id: ur.company_id,
-      see_dashboard: newPerms.see_dashboard,
-      see_history_own: newPerms.see_history_own,
-      see_history_all: newPerms.see_history_all,
-      see_statistics: newPerms.see_statistics,
-      see_team: newPerms.see_team,
-      can_edit_rules: newPerms.can_edit_rules,
-      can_manage_categories: newPerms.can_manage_categories,
-    }
+    const res = await fetch('/api/team/save-permissions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: id,
+        company_id: ur.company_id,
+        permissions: newPerms,
+      }),
+    })
+    const data = await res.json()
 
-    // Try update first, if no rows affected — insert
-    const { data: existing } = await supabase
-      .from('user_permissions')
-      .select('id')
-      .eq('user_id', id)
-      .single()
-
-    let error
-    if (existing) {
-      const { error: e } = await supabase
-        .from('user_permissions')
-        .update(payload)
-        .eq('user_id', id)
-      error = e
+    if (!data.success) {
+      console.error('Permission save error:', data.error)
+      alert('Помилка збереження: ' + data.error)
     } else {
-      const { error: e } = await supabase
-        .from('user_permissions')
-        .insert(payload)
-      error = e
-    }
-
-    if (error) {
-      console.error('Permission save error:', error)
-      alert('Помилка збереження: ' + error.message)
+      setPermSavedId(id)
+      setTimeout(() => setPermSavedId(null), 2000)
     }
   }
 
@@ -462,12 +444,14 @@ export default function TeamPage() {
 
                           {/* Password change */}
                           <div>
-                            <span style={{ ...lbl, fontSize: 11 }}>{isUk ? 'Новий пароль' : 'Новый пароль'}</span>
+                            <span style={{ ...lbl, fontSize: 11 }}>{isUk ? 'Змінити ключ входу' : 'Изменить ключ входа'}</span>
                             <div style={{ display: 'flex', gap: 8 }}>
                               <input
                                 type="text"
-                                autoComplete="off"
-                                placeholder={isUk ? 'Новий пароль (мін. 6 символів)' : 'Новый пароль (мин. 6 символов)'}
+                                autoComplete="new-password"
+                                data-lpignore="true"
+                                data-form-type="other"
+                                placeholder={isUk ? 'Новий ключ (мін. 6 символів)' : 'Новый ключ (мин. 6 символов)'}
                                 value={memberPasswords[member.id] || ''}
                                 onChange={e => setMemberPasswords(p => ({ ...p, [member.id]: e.target.value }))}
                                 style={{ ...f, fontSize: 13, flex: 1 }}
@@ -510,7 +494,12 @@ export default function TeamPage() {
 
                       {/* Right: permissions */}
                       <div>
-                        <p style={{ fontSize: 12, fontWeight: 700, color: C.muted2, textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 14 }}>Доступ до розділів</p>
+                        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 14 }}>
+                          <p style={{ fontSize: 12, fontWeight: 700, color: C.muted2, textTransform: 'uppercase', letterSpacing: '0.7px' }}>Доступ до розділів</p>
+                          {permSavedId === member.id && (
+                            <span style={{ fontSize: 11, color: C.success, fontWeight: 700 }}>✓ Збережено</span>
+                          )}
+                        </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                           {PERM_LABELS_DATA.map(({ key, labelUk, labelRu, descUk, descRu }) => { const label = lang==='uk'?labelUk:labelRu; const desc = lang==='uk'?descUk:descRu;
                             const val = member.permissions[key]
