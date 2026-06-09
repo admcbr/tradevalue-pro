@@ -227,24 +227,19 @@ export default function TeamPage() {
 
 
   async function updatePerm(id: string, key: keyof Permissions, val: boolean) {
-    // Get current member permissions BEFORE state update
     const member = team.find(m => m.id === id)
     if (!member) return
-
-    // Build new permissions with updated value
     const newPerms = { ...member.permissions, [key]: val }
-
-    // Update local state
     setTeam(t => t.map(m => m.id === id ? { ...m, permissions: newPerms } : m))
 
-    // Save to Supabase
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data: ur } = await supabase.from('users').select('company_id').eq('id', user.id).single()
-    if (!ur?.company_id) return
+    if (!user) { console.error('No user'); return }
 
-    const { error } = await supabase.from('user_permissions').upsert({
+    const { data: ur } = await supabase.from('users').select('company_id').eq('id', user.id).single()
+    if (!ur?.company_id) { console.error('No company_id for user'); return }
+
+    const payload = {
       user_id: id,
       company_id: ur.company_id,
       see_dashboard: newPerms.see_dashboard,
@@ -254,9 +249,33 @@ export default function TeamPage() {
       see_team: newPerms.see_team,
       can_edit_rules: newPerms.can_edit_rules,
       can_manage_categories: newPerms.can_manage_categories,
-    }, { onConflict: 'user_id' })
+    }
 
-    if (error) console.error('Permission save error:', error)
+    // Try update first, if no rows affected — insert
+    const { data: existing } = await supabase
+      .from('user_permissions')
+      .select('id')
+      .eq('user_id', id)
+      .single()
+
+    let error
+    if (existing) {
+      const { error: e } = await supabase
+        .from('user_permissions')
+        .update(payload)
+        .eq('user_id', id)
+      error = e
+    } else {
+      const { error: e } = await supabase
+        .from('user_permissions')
+        .insert(payload)
+      error = e
+    }
+
+    if (error) {
+      console.error('Permission save error:', error)
+      alert('Помилка збереження: ' + error.message)
+    }
   }
 
   function updateRole(id: string, role: Role) {
