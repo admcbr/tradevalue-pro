@@ -190,23 +190,38 @@ export default function TeamPage() {
       const { data: userRecord } = await supabase.from('users').select('company_id').eq('id', user.id).single()
       if (userRecord?.company_id) {
         setCompanyId(userRecord.company_id)
-        const { data: members } = await supabase
-          .from('users')
-          .select('*')
-          .eq('company_id', userRecord.company_id)
-          .order('created_at')
+        // Load members AND their saved permissions together
+        const [{ data: members }, { data: permsData }] = await Promise.all([
+          supabase.from('users').select('*').eq('company_id', userRecord.company_id).order('created_at'),
+          supabase.from('user_permissions').select('*').eq('company_id', userRecord.company_id),
+        ])
+
         if (members && members.length > 0) {
-          const mapped = members.map((m: any, i: number) => ({
-            id: m.id,
-            name: m.name || m.email,
-            email: m.email,
-            phone: m.phone || '',
-            address: m.address || '',
-            role: m.role || 'manager',
-            initials: (m.name || m.email).split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0,2),
-            gradient: GRADIENTS[i % GRADIENTS.length],
-            permissions: DEFAULT_PERMS[m.role as keyof typeof DEFAULT_PERMS] || DEFAULT_PERMS.manager,
-          }))
+          const mapped = members.map((m: any, i: number) => {
+            // Find saved permissions for this member
+            const saved = permsData?.find((p: any) => p.user_id === m.id)
+            const defaultPerms = DEFAULT_PERMS[m.role as keyof typeof DEFAULT_PERMS] || DEFAULT_PERMS.manager
+            const permissions: Permissions = saved ? {
+              see_dashboard:        saved.see_dashboard        ?? defaultPerms.see_dashboard,
+              see_history_own:      saved.see_history_own      ?? defaultPerms.see_history_own,
+              see_history_all:      saved.see_history_all      ?? defaultPerms.see_history_all,
+              see_statistics:       saved.see_statistics       ?? defaultPerms.see_statistics,
+              see_team:             saved.see_team             ?? defaultPerms.see_team,
+              can_edit_rules:       saved.can_edit_rules       ?? defaultPerms.can_edit_rules,
+              can_manage_categories:saved.can_manage_categories ?? defaultPerms.can_manage_categories,
+            } : defaultPerms
+            return {
+              id: m.id,
+              name: m.name || m.email,
+              email: m.email,
+              phone: m.phone || '',
+              address: m.address || '',
+              role: m.role || 'manager',
+              initials: (m.name || m.email).split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0,2),
+              gradient: GRADIENTS[i % GRADIENTS.length],
+              permissions,
+            }
+          })
           setTeam(mapped)
         }
       }
