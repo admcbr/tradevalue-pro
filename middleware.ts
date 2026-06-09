@@ -1,13 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-// Routes that don't need auth
 const PUBLIC_PATHS = ['/', '/auth/login', '/auth/register', '/auth/callback', '/auth/reset', '/invite']
-
-// Routes only for owner/admin
-const OWNER_ADMIN_PATHS = ['/categories', '/rules', '/blocked', '/team', '/pricing']
-// Routes only for owner
-const OWNER_ONLY_PATHS = ['/pricing']
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -32,42 +26,58 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const path = request.nextUrl.pathname
 
-  // Admin panel — handles own auth
-  if (path.startsWith('/admin')) {
+  // Admin panel handles own auth
+  if (path.startsWith('/admin')) return supabaseResponse
+
+  // Public paths
+  if (PUBLIC_PATHS.some(p => path === p || path.startsWith('/auth/'))) return supabaseResponse
+
+  // Not logged in
+  if (!user) return NextResponse.redirect(new URL('/auth/login', request.url))
+
+  // Pricing — owner only (no custom permission override)
+  if (path.startsWith('/pricing')) {
+    const { data: ur } = await supabase.from('users').select('role').eq('id', user.id).single()
+    if (ur?.role !== 'owner') return NextResponse.redirect(new URL('/dashboard', request.url))
     return supabaseResponse
   }
 
-  // Public paths — always accessible
-  if (PUBLIC_PATHS.some(p => path === p || path.startsWith('/auth/'))) {
-    return supabaseResponse
+  // For settings pages — check role OR custom permissions
+  const settingsRoutes: Record<string, string> = {
+    '/categories': 'can_manage_categories',
+    '/rules':      'can_edit_rules',
+    '/blocked':    'can_edit_rules',
+    '/team':       'see_team',
   }
 
-  // Not logged in — redirect to login
-  if (!user) {
-    return NextResponse.redirect(new URL('/auth/login', request.url))
-  }
+  const matchedRoute = Object.keys(settingsRoutes).find(r => path.startsWith(r))
+  if (matchedRoute) {
+    const permKey = settingsRoutes[matchedRoute]
+    const { data: ur } = await supabase.from('users').select('role').eq('id', user.id).single()
+    const role = ur?.role || 'manager'
 
-  // Logged in — check role for restricted pages
-  if (OWNER_ADMIN_PATHS.some(p => path.startsWith(p))) {
-    // Get user role from DB
-    const { data: userRecord } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .single()
+    // Owner and admin always have access
+    if (['owner', 'admin'].includes(role)) return supabaseResponse
 
-    const role = userRecord?.role || 'manager'
+    // Check custom permission in user_permissions
+    // Using service role URL to bypass any RLS issues
+    const { data: perms, error: permsError } = await supabase
+      .from('user_permissions')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle()
 
-    // Pricing — owner only
-    if (path.startsWith('/pricing') && role !== 'owner') {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
-    }
+    // If we got a DB error reading permissions — allow access (don't block)
+    if (permsError) return supabaseResponse
 
-    // Categories, rules, blocked, team — owner or admin only
-    const ownerAdminRoutes = ['/categories', '/rules', '/blocked', '/team']
-    if (ownerAdminRoutes.some(r => path.startsWith(r)) && !['owner', 'admin'].includes(role)) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
-    }
+    // If row exists and permission explicitly granted — allow
+    if (perms && (perms as any)[permKey] === true) return supabaseResponse
+
+    // If no permissions row yet — deny
+    if (!perms) return NextResponse.redirect(new URL('/dashboard', request.url))
+
+    // Permission exists but this specific permission is false
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
   return supabaseResponse

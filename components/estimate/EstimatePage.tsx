@@ -61,14 +61,38 @@ export default function EstimatePage() {
   async function handleCalculate() {
     if (!activeCat) return
     const price = parseFloat(marketPrice)
-    if (isNaN(price) || price <= 0) { alert(lang === 'uk' ? 'Вкажіть ринкову ціну' : 'Укажите рыночную цену'); return }
+    if (isNaN(price) || price <= 0) {
+      alert(lang === 'uk' ? 'Вкажіть ринкову ціну' : 'Укажите рыночную цену')
+      return
+    }
+
+    // Validate required fields BEFORE saving
+    const missingRequired = activeCat.fields.filter((f: any) =>
+      f.is_required && (!fieldValues[f.id] || fieldValues[f.id].trim() === '')
+    )
+    if (missingRequired.length > 0) {
+      const names = missingRequired.map((f: any) => f.name).join(', ')
+      alert(lang === 'uk'
+        ? `Заповніть обов'язкові поля: ${names}`
+        : `Заполните обязательные поля: ${names}`)
+      return
+    }
+
     setLoading(true); setResult(null); setSavedId('')
 
     // Calculate result
     const res = calculate({ category: activeCat, field_values: fieldValues, completeness_present: completeness, market_price: price, eval_type: evalType, tradein_bonus_percent: 5 })
     setResult(res)
 
-    // Auto-save to Supabase immediately
+    // Only save if calculation was successful (not blocked by missing fields)
+    // not_evaluated = blocked by rule (too expensive etc) — still save
+    // But if result has no buy_price and is not_evaluated due to missing data — don't save
+    if (!res || res.buy_price === undefined) {
+      setLoading(false)
+      return
+    }
+
+    // Auto-save to Supabase
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
@@ -102,7 +126,7 @@ export default function EstimatePage() {
             setResult(null)
             setLoading(false)
             alert(lang === 'uk'
-  ? '❌ Ліміт оцінок вичерпано на цей місяць. Перейдіть на вищий тариф у розділі «Тарифи».'
+              ? '❌ Ліміт оцінок вичерпано на цей місяць. Перейдіть на вищий тариф у розділі «Тарифи».'
               : '❌ Лимит оценок исчерпан на этот месяц. Перейдите на более высокий тариф в разделе «Тарифы».')
             return
           }
