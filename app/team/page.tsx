@@ -226,8 +226,33 @@ export default function TeamPage() {
   }
 
 
-  function updatePerm(id: string, key: keyof Permissions, val: boolean) {
+  async function updatePerm(id: string, key: keyof Permissions, val: boolean) {
+    // Update local state immediately
     setTeam(t => t.map(m => m.id === id ? { ...m, permissions: { ...m.permissions, [key]: val } } : m))
+    
+    // Save to Supabase user_permissions table
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data: ur } = await supabase.from('users').select('company_id').eq('id', user.id).single()
+    if (!ur?.company_id) return
+
+    // Get current permissions for this member
+    const member = team.find(m => m.id === id)
+    if (!member) return
+    const newPerms = { ...member.permissions, [key]: val }
+
+    await supabase.from('user_permissions').upsert({
+      user_id: id,
+      company_id: ur.company_id,
+      see_dashboard: newPerms.see_dashboard,
+      see_history_own: newPerms.see_history_own,
+      see_history_all: newPerms.see_history_all,
+      see_statistics: newPerms.see_statistics,
+      see_team: newPerms.see_team,
+      can_edit_rules: newPerms.can_edit_rules,
+      can_manage_categories: newPerms.can_manage_categories,
+    }, { onConflict: 'user_id' })
   }
 
   function updateRole(id: string, role: Role) {

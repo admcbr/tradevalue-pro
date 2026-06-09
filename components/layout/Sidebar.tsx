@@ -77,14 +77,15 @@ export default function Sidebar() {
   const [userRole, setUserRole] = useState('')
   const [userRoleKey, setUserRoleKey] = useState('manager')
 
+  const [userPerms, setUserPerms] = useState<Record<string,boolean>>({})
+
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (user) {
-        // Get real name and role from public.users
         const { data: userRecord } = await supabase
           .from('users')
-          .select('name, role')
+          .select('name, role, company_id')
           .eq('id', user.id)
           .single()
 
@@ -94,15 +95,21 @@ export default function Sidebar() {
         setUserName(name)
         setUserInitials(name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2))
 
-        // Translate role to Ukrainian/Russian
         const roleLabels: Record<string, string> = {
-          owner: 'Власник',
-          admin: 'Адмін',
-          manager: 'Менеджер',
-          viewer: 'Перегляд',
+          owner: 'Власник', admin: 'Адмін', manager: 'Менеджер', viewer: 'Перегляд',
         }
         setUserRole(roleLabels[role] || role)
         setUserRoleKey(role)
+
+        // Load custom permissions for this user
+        if (userRecord?.company_id) {
+          const { data: perms } = await supabase
+            .from('user_permissions')
+            .select('*')
+            .eq('user_id', user.id)
+            .single()
+          if (perms) setUserPerms(perms)
+        }
       }
     })
   }, [])
@@ -117,21 +124,28 @@ export default function Sidebar() {
   const isManager = userRoleKey === 'manager'
   const isViewer = userRoleKey === 'viewer'
 
+  // Check if user has permission (role-based OR custom permission)
+  function hasAccess(roles: string[], permKey?: string): boolean {
+    if (!userRoleKey) return true // loading
+    if (roles.includes(userRoleKey)) return true
+    // Check custom permission
+    if (permKey && userPerms[permKey] === true) return true
+    return false
+  }
+
   const allNavItems = [
-    { label:t.dashboard,    href:'/dashboard',  icon:LayoutDashboard, section:'main',     roles:['owner','admin','manager','viewer'] },
-    { label:t.new_estimate, href:'/estimate',   icon:FilePlus,        section:'main',     roles:['owner','admin','manager'] },
-    { label:t.history,      href:'/history',    icon:Clock,           section:'main',     roles:['owner','admin','manager','viewer'] },
-    { label:t.categories,   href:'/categories', icon:Layers,          section:'settings', roles:['owner','admin'] },
-    { label:t.rules,        href:'/rules',      icon:Settings2,       section:'settings', roles:['owner','admin'] },
-    { label:t.blocked,      href:'/blocked',    icon:Ban,             section:'settings', roles:['owner','admin'] },
-    { label:t.team,         href:'/team',       icon:Users,           section:'settings', roles:['owner','admin'] },
-    { label:isUk?'Тарифи':'Тарифы',       href:'/pricing',  icon:CreditCard,      section:'settings', roles:['owner'] },
-    { label:isUk?'Підтримка':'Поддержка', href:'/support',  icon:HeadphonesIcon,  section:'settings', roles:['owner','admin','manager','viewer'] },
+    { label:t.dashboard,    href:'/dashboard',  icon:LayoutDashboard, section:'main',     show: hasAccess(['owner','admin','manager','viewer'], 'see_dashboard') },
+    { label:t.new_estimate, href:'/estimate',   icon:FilePlus,        section:'main',     show: hasAccess(['owner','admin','manager']) },
+    { label:t.history,      href:'/history',    icon:Clock,           section:'main',     show: hasAccess(['owner','admin','manager','viewer'], 'see_history_own') },
+    { label:t.categories,   href:'/categories', icon:Layers,          section:'settings', show: hasAccess(['owner','admin'], 'can_manage_categories') },
+    { label:t.rules,        href:'/rules',      icon:Settings2,       section:'settings', show: hasAccess(['owner','admin'], 'can_edit_rules') },
+    { label:t.blocked,      href:'/blocked',    icon:Ban,             section:'settings', show: hasAccess(['owner','admin']) },
+    { label:t.team,         href:'/team',       icon:Users,           section:'settings', show: hasAccess(['owner','admin'], 'see_team') },
+    { label:isUk?'Тарифи':'Тарифы',       href:'/pricing',  icon:CreditCard,      section:'settings', show: hasAccess(['owner']) },
+    { label:isUk?'Підтримка':'Поддержка', href:'/support',  icon:HeadphonesIcon,  section:'settings', show: hasAccess(['owner','admin','manager','viewer']) },
   ]
 
-  const navItems = allNavItems.filter(item => 
-    !userRoleKey || item.roles.includes(userRoleKey)
-  )
+  const navItems = allNavItems.filter(item => item.show)
 
   // Fix: apply active state properly
   const navWithActive = navItems.map(i=>({ ...i, active: pathname === i.href }))
