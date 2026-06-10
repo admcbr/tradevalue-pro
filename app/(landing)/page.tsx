@@ -706,17 +706,40 @@ export default function LandingPage() {
 
       {/* ── FOOTER ────────────────────────────────────────────────────────── */}
       <footer style={{ borderTop: `1px solid ${C.border}`, padding: '40px 24px' }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 11, color: '#fff' }}>TV</div>
-            <span style={{ fontWeight: 700, fontSize: 14 }}>TradeValue Pro</span>
+        <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 30, height: 30, borderRadius: 8, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 11, color: '#fff' }}>TV</div>
+              <span style={{ fontWeight: 700, fontSize: 14 }}>TradeValue Pro</span>
+            </div>
+            <div style={{ display: 'flex', gap: 24 }}>
+              {[['#product','Продукт'],['#pricing','Ціни'],['#faq','FAQ']].map(([href,label]) => (
+                <a key={href} href={href} style={{ fontSize: 13, color: C.muted2, textDecoration: 'none' }}>{label}</a>
+              ))}
+            </div>
           </div>
-          <p style={{ fontSize: 13, color: C.muted2 }}>© 2025 TradeValue Pro. Система оцінки б/у техніки.</p>
-          <div style={{ display: 'flex', gap: 24 }}>
-            {[['#product','Продукт'],['#pricing','Ціни'],['#faq','FAQ']].map(([href,label]) => (
-              <a key={href} href={href} style={{ fontSize: 13, color: C.muted2, textDecoration: 'none' }}>{label}</a>
-            ))}
+          <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
+            <div>
+              <p style={{ fontSize: 12, color: C.muted2, marginBottom: 4 }}>© 2025 TradeValue Pro. Система оцінки б/у техніки.</p>
+              <p style={{ fontSize: 11, color: C.muted2 }}>ФОП Матящук Андрій Анатолійович · ЄРДПОУ 3369301195 · м. Вінниця, Україна</p>
+            </div>
+            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+              {[
+                ['/terms', 'Публічна оферта'],
+                ['/terms#5', 'Умови повернення'],
+                ['/support', 'Контакти'],
+              ].map(([href, label]) => (
+                <a key={href} href={href} style={{ fontSize: 12, color: C.muted2, textDecoration: 'none', borderBottom: '1px solid transparent' }}
+                  onMouseEnter={e => (e.target as HTMLElement).style.color = C.muted}
+                  onMouseLeave={e => (e.target as HTMLElement).style.color = C.muted2}>
+                  {label}
+                </a>
+              ))}
+            </div>
           </div>
+          <p style={{ fontSize: 11, color: C.muted2, marginTop: 12, opacity: 0.7 }}>
+            Оплата через LiqPay. Здійснюючи оплату, ви погоджуєтесь з <a href="/terms" style={{ color: C.muted2, textDecoration: 'underline' }}>умовами надання послуг</a> та <a href="/terms#5" style={{ color: C.muted2, textDecoration: 'underline' }}>політикою повернення</a>.
+          </p>
         </div>
       </footer>
 
