@@ -119,6 +119,37 @@ const FAQ_RU = [
 export default function PricingPage() {
   const { t, lang } = useLang()
   const [annual, setAnnual] = useState(false)
+  const [payLoading, setPayLoading] = useState<string|null>(null)
+
+  async function handlePayment(planId: string) {
+    if (planId === 'starter') return
+    setPayLoading(planId)
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { window.location.href = '/auth/login'; return }
+
+      const planKey = `${planId}_${annual ? 'year' : 'month'}`
+      const res = await fetch('/api/payment/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ planKey }),
+      })
+      const data = await res.json()
+
+      if (data.pageUrl) {
+        window.location.href = data.pageUrl
+      } else {
+        alert('Помилка: ' + (data.error || 'Не вдалось створити платіж'))
+      }
+    } catch (e) {
+      alert('Помилка з\'єднання з платіжною системою')
+    }
+    setPayLoading(null)
+  }
   const [usageCount, setUsageCount] = useState(0)
   const [planLimit, setPlanLimit] = useState(5)
   const [currentPlan, setCurrentPlan] = useState('starter')
