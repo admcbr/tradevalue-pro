@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { Shield, Lock, ArrowRight } from 'lucide-react'
 
 const ADMIN_EMAIL = 'wertuvenom@gmail.com'
-const SECRET_WORD = 'Lima63'
+// SECRET_WORD is verified server-side via /api/admin/verify-secret
 
 const C = {
   bg: '#07070C', card: '#0E0E18', border: '#1E1E32', border2: '#2A2A44',
@@ -37,7 +37,17 @@ export default function AdminPage() {
       return
     }
 
-    if (secretInput.trim() !== SECRET_WORD) {
+    setLoading(true)
+    // Verify secret server-side — never exposed in client code
+    const res = await fetch('/api/admin/verify-secret', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: secretInput.trim() }),
+    })
+
+    setLoading(false)
+
+    if (!res.ok) {
       const newAttempts = attempts + 1
       setAttempts(newAttempts)
       if (newAttempts >= 3) {

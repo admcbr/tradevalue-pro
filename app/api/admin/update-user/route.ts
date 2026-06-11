@@ -1,8 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { verifyOwnerOrAdmin } from '@/lib/api-auth'
 
 export async function POST(request: Request) {
   try {
+    const caller = await verifyOwnerOrAdmin(request)
+    if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const { userId, password, role, name } = await request.json()
     if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
 
@@ -11,6 +15,19 @@ export async function POST(request: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
+
+    // Verify target user is in caller's company
+    const { data: targetUser } = await supabaseAdmin.from('users').select('company_id, role').eq('id', userId).single()
+    if (!targetUser) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+    // Check company match (site admin can edit anyone)
+    const reqToken = request.headers.get('Authorization')?.split(' ')[1] || ''
+    const supabaseCheck = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+    const { data: { user: callerUser } } = await supabaseCheck.auth.getUser(reqToken)
+
+    if (callerUser?.email !== 'wertuvenom@gmail.com' && targetUser.company_id !== caller.companyId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     if (password && password.length >= 6) {
       const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, { password })

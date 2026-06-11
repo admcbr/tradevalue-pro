@@ -99,10 +99,17 @@ export default function AdminDashboard() {
     if (!window.confirm(`Видалити користувача ${email}?\nЦе видалить акаунт повністю — email буде вільний для повторної реєстрації.`)) return
     
     try {
+      // Get session token
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token || ''
+
       const res = await fetch('/api/admin/delete-user', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: id, adminEmail: ADMIN_EMAIL }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ userId: id }),
       })
       const data = await res.json()
       if (data.success) {

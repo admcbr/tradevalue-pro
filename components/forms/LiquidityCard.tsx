@@ -1,4 +1,5 @@
 'use client'
+import { createClient } from "@/lib/supabase"
 
 import { useState } from 'react'
 import { TrendingUp, TrendingDown, Minus, Zap, Clock, ThumbsUp, ThumbsDown, AlertCircle, Search } from 'lucide-react'

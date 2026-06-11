@@ -94,6 +94,13 @@ const PERM_LABELS_DATA = [
 const INITIAL_TEAM: Member[] = []
 
 // ─── Component ────────────────────────────────────────────────────────────────
+async function getAuthToken(): Promise<string> {
+  const { createClient } = await import('@/lib/supabase')
+  const supabase = createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  return session?.access_token || ''
+}
+
 export default function TeamPage() {
   const { t, lang } = useLang()
   const isUk = lang === 'uk'
@@ -255,9 +262,13 @@ export default function TeamPage() {
     const { data: ur } = await supabase.from('users').select('company_id').eq('id', user.id).single()
     if (!ur?.company_id) return
 
+    const token = await getAuthToken()
     const res = await fetch('/api/team/save-permissions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
       body: JSON.stringify({
         user_id: id,
         company_id: ur.company_id,
@@ -444,9 +455,13 @@ export default function TeamPage() {
                                   const newRole = e.target.value as Role
                                   updateRole(member.id, newRole)
                                   // Save role to Supabase via API
+                                  const token2 = await getAuthToken()
                                   await fetch('/api/admin/update-user', {
                                     method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
+                                    headers: { 
+                                      'Content-Type': 'application/json',
+                                      'Authorization': `Bearer ${token2}`,
+                                    },
                                     body: JSON.stringify({ userId: member.id, role: newRole }),
                                   })
                                 }}>
@@ -479,9 +494,13 @@ export default function TeamPage() {
                                     return
                                   }
                                   setSavingMember(member.id)
+                                  const token = await getAuthToken()
                                   const res = await fetch('/api/admin/update-user', {
                                     method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
+                                    headers: { 
+                                      'Content-Type': 'application/json',
+                                      'Authorization': `Bearer ${token}`,
+                                    },
                                     body: JSON.stringify({ userId: member.id, password: pwd }),
                                   })
                                   const data = await res.json()

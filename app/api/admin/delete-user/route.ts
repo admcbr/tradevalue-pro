@@ -1,19 +1,17 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-
-const ADMIN_EMAIL = 'wertuvenom@gmail.com'
+import { verifyAdmin } from '@/lib/api-auth'
 
 export async function POST(request: Request) {
   try {
-    const { userId, adminEmail } = await request.json()
-
-    if (adminEmail !== ADMIN_EMAIL) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    // Only site admin can delete users
+    const isAdmin = await verifyAdmin(request)
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!userId) {
-      return NextResponse.json({ error: 'userId required' }, { status: 400 })
-    }
+    const { userId } = await request.json()
+    if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
 
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,15 +19,9 @@ export async function POST(request: Request) {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    // Delete from public.users
     await supabaseAdmin.from('users').delete().eq('id', userId)
-
-    // Delete from auth.users (requires service role key)
     const { error } = await supabaseAdmin.auth.admin.deleteUser(userId)
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     return NextResponse.json({ success: true })
   } catch (e: any) {
