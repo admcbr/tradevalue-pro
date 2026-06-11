@@ -218,13 +218,23 @@ export default function PricingPage() {
           border: '1px solid rgba(248,113,113,0.2)', background: 'transparent',
           color: '#F87171', fontFamily: 'inherit', fontSize: 12, fontWeight: 600, cursor: 'pointer',
         }}
-          onClick={() => {
-            if (window.confirm(isUk
-              ? 'Ви впевнені що хочете скасувати підписку? Поточний план буде активний до кінця оплаченого періоду.'
-              : 'Вы уверены что хотите отменить подписку? Текущий план будет активен до конца оплаченного периода.'
-            )) {
-              alert(isUk ? 'Підписку скасовано. Ваш план залишається активним до кінця поточного циклу.' : 'Подписка отменена. Ваш план остаётся активным до конца текущего цикла.')
+          onClick={async () => {
+            if (!window.confirm(isUk
+              ? 'Скасувати підписку? Поточний план буде активний до кінця оплаченого періоду, після чого переключиться на Starter.'
+              : 'Отменить подписку? Текущий план останется активным до конца оплаченного периода, после чего переключится на Starter.'
+            )) return
+
+            // Mark subscription as cancelled (won't auto-renew)
+            const supabase = createClient()
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+            const { data: ur } = await supabase.from('users').select('company_id').eq('id', user.id).single()
+            if (ur?.company_id) {
+              await supabase.from('companies').update({ subscription_cancelled: true }).eq('id', ur.company_id)
             }
+            alert(isUk
+              ? '✓ Підписку скасовано. Ваш план залишається активним до кінця поточного циклу.'
+              : '✓ Подписка отменена. Ваш план остаётся активным до конца текущего цикла.')
           }}>
           {isUk ? 'Скасувати підписку' : 'Отменить подписку'}
         </button>
@@ -330,22 +340,48 @@ export default function PricingPage() {
               <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted2 }}><X size={18} /></button>
             </div>
 
+            {/* Plan summary */}
             <div style={{ padding: '16px', borderRadius: 12, background: C.card2, border: `1px solid ${C.border2}`, marginBottom: 20 }}>
-              <p style={{ fontSize: 13, color: C.muted, textAlign: 'center', lineHeight: 1.7 }}>
-                {isUk
-                  ? 'Оплата через Stripe або LiqPay. Після підтвердження тариф активується миттєво.'
-                  : 'Оплата через Stripe или LiqPay. После подтверждения тариф активируется мгновенно.'}
-              </p>
+              {(() => {
+                const plan = PLANS.find(p => p.id === selected)
+                const price = annual ? plan?.priceYear : plan?.priceMonth
+                return (
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: 13, color: C.muted, marginBottom: 8 }}>
+                      {plan?.name} · {annual ? (isUk ? 'річна оплата' : 'годовая оплата') : (isUk ? 'щомісячна оплата' : 'ежемесячная оплата')}
+                    </p>
+                    <p style={{ fontSize: 28, fontWeight: 900, color: C.text }}>
+                      {price === 0 ? (isUk ? 'Безкоштовно' : 'Бесплатно') : `₴${price?.toLocaleString('uk-UA')}`}
+                      {price !== 0 && <span style={{ fontSize: 13, color: C.muted, fontWeight: 400 }}> /міс</span>}
+                    </p>
+                    {annual && price !== 0 && (
+                      <p style={{ fontSize: 12, color: C.success, marginTop: 4 }}>
+                        {isUk ? `Економія ₴${(((plan?.priceMonth || 0) - price) * 12).toLocaleString('uk-UA')} на рік` : `Экономия ₴${(((plan?.priceMonth || 0) - price) * 12).toLocaleString('uk-UA')} в год`}
+                      </p>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <button style={{ padding: '12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#6382FF,#A78BFA)', color: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
-                💳 {isUk ? 'Оплатити карткою' : 'Оплатить картой'}
+              <button
+                onClick={() => { handlePayment(selected!); setSelected(null) }}
+                disabled={payLoading === selected}
+                style={{
+                  padding: '13px', borderRadius: 10, border: 'none',
+                  background: payLoading === selected ? C.border2 : 'linear-gradient(135deg,#6382FF,#A78BFA)',
+                  color: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 15,
+                  cursor: payLoading === selected ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  boxShadow: '0 0 24px rgba(99,130,255,0.3)',
+                }}>
+                {payLoading === selected
+                  ? <><span style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin .8s linear infinite', display: 'inline-block' }} />{isUk ? 'Завантаження...' : 'Загрузка...'}</>
+                  : <>💳 {isUk ? 'Оплатити через Mono' : 'Оплатить через Mono'}</>
+                }
               </button>
-              <button style={{ padding: '12px', borderRadius: 10, border: `1px solid ${C.border2}`, background: C.card2, color: C.muted, fontFamily: 'inherit', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
-                🏦 {isUk ? 'LiqPay / Приват24' : 'LiqPay / Приват24'}
-              </button>
-              <button onClick={() => setSelected(null)} style={{ padding: '12px', borderRadius: 10, border: 'none', background: 'transparent', color: C.muted2, fontFamily: 'inherit', fontSize: 13, cursor: 'pointer' }}>
+              <button onClick={() => setSelected(null)} style={{ padding: '11px', borderRadius: 10, border: 'none', background: 'transparent', color: C.muted2, fontFamily: 'inherit', fontSize: 13, cursor: 'pointer' }}>
                 {isUk ? 'Скасувати' : 'Отмена'}
               </button>
             </div>

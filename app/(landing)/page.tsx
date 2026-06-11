@@ -738,7 +738,7 @@ export default function LandingPage() {
             </div>
           </div>
           <p style={{ fontSize: 11, color: C.muted2, marginTop: 12, opacity: 0.7 }}>
-            Оплата через LiqPay. Здійснюючи оплату, ви погоджуєтесь з <a href="/terms" style={{ color: C.muted2, textDecoration: 'underline' }}>умовами надання послуг</a> та <a href="/terms#5" style={{ color: C.muted2, textDecoration: 'underline' }}>політикою повернення</a>.
+            Оплата через Plata by Mono. Здійснюючи оплату, ви погоджуєтесь з <a href="/terms" style={{ color: C.muted2, textDecoration: 'underline' }}>умовами надання послуг</a> та <a href="/terms#5" style={{ color: C.muted2, textDecoration: 'underline' }}>політикою повернення</a>.
           </p>
         </div>
       </footer>
