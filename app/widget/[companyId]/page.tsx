@@ -60,9 +60,11 @@ export default function WidgetPage() {
     if (!cat || !price) return null
     // Remove internal __custom__ marker keys before passing to engine
     const cleanFields: Record<string,string> = {}
+    const HIDDEN_FIELDS = ['lf_water','lf_bios']
     Object.entries(fields).forEach(([k, v]) => {
       if (k.endsWith('__custom')) return  // skip helper keys
       if (v === '__custom__') return       // skip placeholder value
+      if (HIDDEN_FIELDS.includes(k)) return // skip widget-hidden fields
       cleanFields[k] = v
     })
     return calculate({
@@ -310,7 +312,7 @@ export default function WidgetPage() {
 
                 <button style={btnPrimary(!cat)} onClick={() => {
                   if (!cat) return
-                  const missing = cat.fields.filter(f => f.is_required && !fields[f.id])
+                  const missing = cat.fields.filter(f => !['lf_water','lf_bios'].includes(f.id) && f.is_required && !fields[f.id])
                   if (missing.length) { alert(`Заповніть обов'язкові поля:\n${missing.map(f => f.name).join('\n')}`); return }
                   if (!price || parseFloat(price) <= 0) { alert('Вкажіть ринкову ціну'); return }
                   setStep(2)
