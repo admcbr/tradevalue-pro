@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Shield, Lock, ArrowRight } from 'lucide-react'
 
-const ADMIN_EMAIL = 'wertuvenom@gmail.com'
+const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || ''
 // SECRET_WORD is verified server-side via /api/admin/verify-secret
 
 const C = {

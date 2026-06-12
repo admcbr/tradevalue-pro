@@ -16,27 +16,33 @@ export async function POST(request: Request) {
     const body = await request.text()
     const data = JSON.parse(body)
 
-    // Verify webhook signature from Monobank
+    // Verify webhook signature from Monobank — REQUIRED
     const signHeader = request.headers.get('X-Sign')
-    if (signHeader) {
-      // Get public key from Monobank
-      const pubKeyRes = await fetch('https://api.monobank.ua/api/merchant/pubkey', {
-        headers: { 'X-Token': MONO_TOKEN }
-      })
-      const { key } = await pubKeyRes.json()
+    if (!signHeader) {
+      console.error('Missing X-Sign header — rejecting webhook')
+      return NextResponse.json({ error: 'Missing signature' }, { status: 403 })
+    }
 
-      if (key) {
-        const verify = crypto.createVerify('SHA256')
-        verify.update(body)
-        const isValid = verify.verify(
-          { key: Buffer.from(key, 'base64'), format: 'der', type: 'spki' },
-          Buffer.from(signHeader, 'base64')
-        )
-        if (!isValid) {
-          console.error('Invalid webhook signature')
-          return NextResponse.json({ error: 'Invalid signature' }, { status: 403 })
-        }
-      }
+    // Get public key from Monobank
+    const pubKeyRes = await fetch('https://api.monobank.ua/api/merchant/pubkey', {
+      headers: { 'X-Token': MONO_TOKEN }
+    })
+    const { key } = await pubKeyRes.json()
+
+    if (!key) {
+      console.error('Could not fetch Monobank public key')
+      return NextResponse.json({ error: 'Signature verification failed' }, { status: 403 })
+    }
+
+    const verify = crypto.createVerify('SHA256')
+    verify.update(body)
+    const isValid = verify.verify(
+      { key: Buffer.from(key, 'base64'), format: 'der', type: 'spki' },
+      Buffer.from(signHeader, 'base64')
+    )
+    if (!isValid) {
+      console.error('Invalid webhook signature')
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 403 })
     }
 
     const { invoiceId, status, reference } = data

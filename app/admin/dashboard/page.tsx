@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { Shield, LogOut, RefreshCw, Search, Download, Edit2, Check, X, ChevronDown } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
-const ADMIN_EMAIL = 'wertuvenom@gmail.com'
+const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || ''
 
 const C = {
   bg: '#07070C', card: '#0E0E18', card2: '#141422', border: '#1E1E32', border2: '#2A2A44',

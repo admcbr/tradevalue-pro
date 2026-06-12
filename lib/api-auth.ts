@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
-const ADMIN_EMAIL = 'wertuvenom@gmail.com'
+// Admin email from environment — never hardcode in source
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || ''
 
 // Verify request comes from authenticated owner/admin using Authorization header
 export async function verifyOwnerOrAdmin(request: Request): Promise<{ userId: string; role: string; companyId: string } | null> {
@@ -18,7 +19,7 @@ export async function verifyOwnerOrAdmin(request: Request): Promise<{ userId: st
   const { data: { user }, error } = await supabase.auth.getUser(token)
   if (error || !user) return null
 
-  // Get role from DB
+  // Get role from DB using service role to bypass RLS
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -41,6 +42,8 @@ export async function verifyOwnerOrAdmin(request: Request): Promise<{ userId: st
 }
 
 export async function verifyAdmin(request: Request): Promise<boolean> {
+  if (!ADMIN_EMAIL) return false
+
   const authHeader = request.headers.get('Authorization')
   if (!authHeader?.startsWith('Bearer ')) return false
 

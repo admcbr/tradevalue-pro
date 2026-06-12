@@ -1,12 +1,32 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { verifyOwnerOrAdmin } from '@/lib/api-auth'
 
 export async function POST(request: Request) {
   try {
+    // Verify caller is authenticated owner/admin
+    const caller = await verifyOwnerOrAdmin(request)
+    if (!caller) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { name, email, password, role, companyId, phone, address } = await request.json()
 
     if (!email || !password || !companyId) {
       return NextResponse.json({ error: 'email, password, companyId required' }, { status: 400 })
+    }
+
+    // Owners can only create users in their own company
+    if (caller.companyId !== companyId) {
+      return NextResponse.json({ error: 'Forbidden: cannot create users in other companies' }, { status: 403 })
+    }
+
+    // Prevent privilege escalation
+    const roleHierarchy = ['viewer', 'manager', 'admin', 'owner']
+    const callerLevel = roleHierarchy.indexOf(caller.role)
+    const newRoleLevel = roleHierarchy.indexOf(role || 'manager')
+    if (newRoleLevel >= callerLevel) {
+      return NextResponse.json({ error: 'Cannot assign equal or higher role' }, { status: 403 })
     }
 
     const supabaseAdmin = createClient(
@@ -19,7 +39,7 @@ export async function POST(request: Request) {
     const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // auto-confirm email
+      email_confirm: true,
       user_metadata: { name },
     })
 
@@ -27,7 +47,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: authError.message }, { status: 400 })
     }
 
-    // Create/update record in public.users with company_id
+    // Create record in public.users with company_id
     const { error: userError } = await supabaseAdmin.from('users').upsert({
       id: authUser.user.id,
       email,

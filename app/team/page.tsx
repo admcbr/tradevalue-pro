@@ -128,9 +128,13 @@ export default function TeamPage() {
     setInviteLoading(true)
 
     try {
+      const token = await getAuthToken()
       const res = await fetch('/api/admin/create-member', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({
           name: iName,
           email: iEmail,

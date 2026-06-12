@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     const supabaseCheck = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
     const { data: { user: callerUser } } = await supabaseCheck.auth.getUser(reqToken)
 
-    if (callerUser?.email !== 'wertuvenom@gmail.com' && targetUser.company_id !== caller.companyId) {
+    if (callerUser?.email !== process.env.ADMIN_EMAIL || '' && targetUser.company_id !== caller.companyId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
