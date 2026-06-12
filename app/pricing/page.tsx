@@ -360,7 +360,10 @@ export default function PricingPage() {
                     </p>
                     {annual && price !== 0 && (
                       <p style={{ fontSize: 12, color: C.success, marginTop: 4 }}>
-                        {isUk ? `Економія ₴${(((plan?.priceMonth || 0) - price) * 12).toLocaleString('uk-UA')} на рік` : `Экономия ₴${(((plan?.priceMonth || 0) - price) * 12).toLocaleString('uk-UA')} в год`}
+                        {(() => {
+                          const saved = (((plan?.priceMonth || 0) - (price || 0)) * 12).toLocaleString('uk-UA')
+                          return isUk ? `Економія ₴${saved} на рік` : `Экономия ₴${saved} в год`
+                        })()}
                       </p>
                     )}
                   </div>

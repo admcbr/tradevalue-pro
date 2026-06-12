@@ -37,6 +37,7 @@ export async function middleware(request: NextRequest) {
 
   // Helper: get role from metadata (fast) or DB (fallback)
   async function getUserRole(): Promise<string> {
+    if (!user) return 'manager'
     const metaRole = user.user_metadata?.role
     if (metaRole) return metaRole
     const { data: ur } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle()
