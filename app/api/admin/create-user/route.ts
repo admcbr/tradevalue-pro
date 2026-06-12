@@ -21,7 +21,7 @@ export async function POST(request: Request) {
       // Allow site admin to create anywhere
       const supabaseCheck = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
       const { data: { user } } = await supabaseCheck.auth.getUser(request.headers.get('Authorization')?.split(' ')[1] || '')
-      if (user?.email !== process.env.ADMIN_EMAIL || '' && caller.companyId !== company_id) {
+      if (user?.email !== (process.env.ADMIN_EMAIL || '') && caller.companyId !== company_id) {
         return NextResponse.json({ error: 'Forbidden: cannot create users in other companies' }, { status: 403 })
       }
     }
