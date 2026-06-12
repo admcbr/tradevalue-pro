@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, FilePlus, Clock, Settings2, Ban, Users, LogOut, Layers, Menu, X, CreditCard, HeadphonesIcon } from 'lucide-react'
+import { Inbox, LayoutDashboard, FilePlus, Clock, Settings2, Ban, Users, LogOut, Layers, Menu, X, CreditCard, HeadphonesIcon } from 'lucide-react'
 import { useLang, type Lang } from '@/lib/i18n'
 
 const C = { sidebar:'#0E0E16', border:'#1E1E30', accent:'#6382FF', text:'#EDEDF0', muted:'#7070A0', muted2:'#3D3D60' }
@@ -137,6 +137,7 @@ export default function Sidebar() {
     { label:t.dashboard,    href:'/dashboard',  icon:LayoutDashboard, section:'main',     show: hasAccess(['owner','admin','manager','viewer'], 'see_dashboard') },
     { label:t.new_estimate, href:'/estimate',   icon:FilePlus,        section:'main',     show: hasAccess(['owner','admin','manager']) },
     { label:t.history,      href:'/history',    icon:Clock,           section:'main',     show: hasAccess(['owner','admin','manager','viewer'], 'see_history_own') },
+    { label:isUk?'Заявки':'Заявки',     href:'/leads',   icon:Inbox,           section:'main',     show: hasAccess(['owner','admin','manager']) },
     { label:t.categories,   href:'/categories', icon:Layers,          section:'settings', show: hasAccess(['owner','admin'], 'can_manage_categories') },
     { label:t.rules,        href:'/rules',      icon:Settings2,       section:'settings', show: hasAccess(['owner','admin'], 'can_edit_rules') },
     { label:t.blocked,      href:'/blocked',    icon:Ban,             section:'settings', show: hasAccess(['owner','admin']) },
