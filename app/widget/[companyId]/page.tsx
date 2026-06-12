@@ -58,9 +58,16 @@ export default function WidgetPage() {
 
   function doCalculate() {
     if (!cat || !price) return null
+    // Remove internal __custom__ marker keys before passing to engine
+    const cleanFields: Record<string,string> = {}
+    Object.entries(fields).forEach(([k, v]) => {
+      if (k.endsWith('__custom')) return  // skip helper keys
+      if (v === '__custom__') return       // skip placeholder value
+      cleanFields[k] = v
+    })
     return calculate({
       category: cat,
-      field_values: fields,
+      field_values: cleanFields,
       completeness_present: completeness,
       market_price: parseFloat(price),
       eval_type: 'buyout',
@@ -142,23 +149,46 @@ export default function WidgetPage() {
 
   function renderField(field: any) {
     const v = fields[field.id] || ''
-    if (field.type === 'select') return (
-      <div key={field.id}>
-        <label style={lbl}>{field.name}{field.is_required && ' *'}</label>
-        <div style={{ position: 'relative' }}>
-          <select value={v} onChange={e => setFields(p => ({ ...p, [field.id]: e.target.value }))}
-            style={{ ...inp, appearance: 'none', paddingRight: 36, cursor: 'pointer' }}>
-            <option value="">Оберіть...</option>
-            {field.options?.map((o: any) => (
-              <option key={o.id} value={o.name} disabled={o.block_estimation}>
-                {o.name}{o.block_estimation ? ' ✗' : ''}
-              </option>
-            ))}
-          </select>
-          <ChevronDown size={13} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: C.muted2, pointerEvents: 'none' }} />
+    if (field.type === 'select') {
+      const isCustom = v === '__custom__' || (v && !field.options?.find((o: any) => o.name === v) && v !== '')
+      const customKey = field.id + '__custom'
+      return (
+        <div key={field.id}>
+          <label style={lbl}>{field.name}{field.is_required && ' *'}</label>
+          <div style={{ position: 'relative' }}>
+            <select
+              value={isCustom ? '__custom__' : v}
+              onChange={e => {
+                if (e.target.value === '__custom__') {
+                  setFields(p => ({ ...p, [field.id]: '__custom__' }))
+                } else {
+                  setFields(p => { const n = { ...p }; delete n[customKey]; n[field.id] = e.target.value; return n })
+                }
+              }}
+              style={{ ...inp, appearance: 'none', paddingRight: 36, cursor: 'pointer' }}>
+              <option value="">Оберіть...</option>
+              {field.options?.map((o: any) => (
+                <option key={o.id} value={o.name} disabled={o.block_estimation}>
+                  {o.name}{o.block_estimation ? ' ✗' : ''}
+                </option>
+              ))}
+              <option value="__custom__">✏️ Ввести вручну...</option>
+            </select>
+            <ChevronDown size={13} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: C.muted2, pointerEvents: 'none' }} />
+          </div>
+          {isCustom && (
+            <input
+              autoFocus
+              type="text"
+              value={fields[customKey] || ''}
+              onChange={e => setFields(p => ({ ...p, [customKey]: e.target.value, [field.id]: e.target.value || '__custom__' }))}
+              placeholder={`Введіть ${field.name.toLowerCase()}...`}
+              style={{ ...inp, marginTop: 8, border: `1px solid ${accent}66` }}
+            />
+          )}
         </div>
-      </div>
-    )
+      )
+    }
     if (field.type === 'checkbox') return (
       <div key={field.id} onClick={() => setFields(p => ({ ...p, [field.id]: p[field.id] === 'true' ? '' : 'true' }))}
         style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '6px 0' }}>
@@ -268,7 +298,7 @@ export default function WidgetPage() {
                 </div>
 
                 {cat && <>
-                  {cat.fields.map(f => renderField(f))}
+                  {cat.fields.filter(f => !['lf_water','lf_bios'].includes(f.id)).map(f => renderField(f))}
 
                   <div>
                     <label style={lbl}>Ринкова ціна (₴) *</label>
@@ -334,7 +364,7 @@ export default function WidgetPage() {
 
                 <div style={{ display: 'flex', gap: 10 }}>
                   <button onClick={() => setStep(1)} style={btnBack}><ChevronLeft size={14} /> Назад</button>
-                  <button style={{ ...btnPrimary(), flex: 1 }} onClick={() => { setResult(doCalculate()); setStep(3) }}>
+                  <button style={{ ...btnPrimary(false), flex: 1 }} onClick={() => { setResult(doCalculate()); setStep(3) }}>
                     Розрахувати ціну →
                   </button>
                 </div>
