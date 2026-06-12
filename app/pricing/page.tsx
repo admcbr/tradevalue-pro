@@ -142,13 +142,17 @@ export default function PricingPage() {
 
       if (data.pageUrl) {
         window.location.href = data.pageUrl
+        // Don't reset loading — page will redirect
       } else {
+        setSelected(null)
         alert('Помилка: ' + (data.error || 'Не вдалось створити платіж'))
+        setPayLoading(null)
       }
     } catch (e) {
+      setSelected(null)
       alert('Помилка з\'єднання з платіжною системою')
+      setPayLoading(null)
     }
-    setPayLoading(null)
   }
   const [usageCount, setUsageCount] = useState(0)
   const [planLimit, setPlanLimit] = useState(5)
@@ -366,22 +370,23 @@ export default function PricingPage() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <button
-                onClick={() => { handlePayment(selected!); setSelected(null) }}
-                disabled={payLoading === selected}
+                onClick={() => handlePayment(selected!)}
+                disabled={!!payLoading}
                 style={{
                   padding: '13px', borderRadius: 10, border: 'none',
-                  background: payLoading === selected ? C.border2 : 'linear-gradient(135deg,#6382FF,#A78BFA)',
+                  background: payLoading ? C.border2 : 'linear-gradient(135deg,#6382FF,#A78BFA)',
                   color: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 15,
-                  cursor: payLoading === selected ? 'not-allowed' : 'pointer',
+                  cursor: payLoading ? 'not-allowed' : 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  boxShadow: '0 0 24px rgba(99,130,255,0.3)',
+                  boxShadow: payLoading ? 'none' : '0 0 24px rgba(99,130,255,0.3)',
+                  opacity: payLoading ? 0.7 : 1,
                 }}>
-                {payLoading === selected
-                  ? <><span style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin .8s linear infinite', display: 'inline-block' }} />{isUk ? 'Завантаження...' : 'Загрузка...'}</>
-                  : <>💳 {isUk ? 'Оплатити через Mono' : 'Оплатить через Mono'}</>
+                {payLoading
+                  ? <><span style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin .8s linear infinite', display: 'inline-block' }} />{isUk ? 'Відкриваємо оплату...' : 'Открываем оплату...'}</>
+                  : <>💳 {isUk ? 'Оплатити через Monobank' : 'Оплатить через Monobank'}</>
                 }
               </button>
-              <button onClick={() => setSelected(null)} style={{ padding: '11px', borderRadius: 10, border: 'none', background: 'transparent', color: C.muted2, fontFamily: 'inherit', fontSize: 13, cursor: 'pointer' }}>
+              <button onClick={() => { setSelected(null); setPayLoading(null) }} disabled={!!payLoading} style={{ padding: '11px', borderRadius: 10, border: 'none', background: 'transparent', color: payLoading ? C.muted2 : C.muted, fontFamily: 'inherit', fontSize: 13, cursor: payLoading ? 'not-allowed' : 'pointer', opacity: payLoading ? 0.4 : 1 }}>
                 {isUk ? 'Скасувати' : 'Отмена'}
               </button>
             </div>
