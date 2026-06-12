@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { CheckCircle, AlertTriangle, XCircle, ChevronDown, ChevronLeft, Send, Package, Cpu } from 'lucide-react'
 import type { Category, EstimationResult } from '@/lib/types'
@@ -41,6 +41,16 @@ export default function WidgetPage() {
   const [submitting, setSubmitting] = useState(false)
   const [phoneError, setPhoneError] = useState(false)
 
+  // Refs to always have fresh values in callbacks (iframe safe)
+  const catRef = useRef(cat)
+  const priceRef = useRef(price)
+  const fieldsRef = useRef(fields)
+  const completenessRef = useRef(completeness)
+  useEffect(() => { catRef.current = cat }, [cat])
+  useEffect(() => { priceRef.current = price }, [price])
+  useEffect(() => { fieldsRef.current = fields }, [fields])
+  useEffect(() => { completenessRef.current = completeness }, [completeness])
+
   useEffect(() => {
     fetch(`/api/widget/config?company_id=${companyId}`)
       .then(r => r.json())
@@ -57,21 +67,26 @@ export default function WidgetPage() {
   }
 
   function doCalculate() {
-    if (!cat || !price) return null
+    const _cat = catRef.current
+    const _price = priceRef.current
+    const _fields = fieldsRef.current
+    const _completeness = completenessRef.current
+    if (!_cat) { console.error('Widget: no category selected'); return null }
+    if (!_price) { console.error('Widget: no price entered'); return null }
     // Remove internal __custom__ marker keys before passing to engine
     const cleanFields: Record<string,string> = {}
     const HIDDEN_FIELDS = ['lf_water','lf_bios']
-    Object.entries(fields).forEach(([k, v]) => {
+    Object.entries(_fields).forEach(([k, v]) => {
       if (k.endsWith('__custom')) return  // skip helper keys
       if (v === '__custom__') return       // skip placeholder value
       if (HIDDEN_FIELDS.includes(k)) return // skip widget-hidden fields
       cleanFields[k] = v
     })
     return calculate({
-      category: cat,
+      category: _cat,
       field_values: cleanFields,
-      completeness_present: completeness,
-      market_price: parseFloat(price),
+      completeness_present: _completeness,
+      market_price: parseFloat(_price),
       eval_type: 'buyout',
       tradein_bonus_percent: 0,
     })
@@ -366,7 +381,18 @@ export default function WidgetPage() {
 
                 <div style={{ display: 'flex', gap: 10 }}>
                   <button onClick={() => setStep(1)} style={btnBack}><ChevronLeft size={14} /> Назад</button>
-                  <button style={{ ...btnPrimary(false), flex: 1 }} onClick={() => { setResult(doCalculate()); setStep(3) }}>
+                  <button
+                    type="button"
+                    disabled={false}
+                    style={{ ...btnPrimary(false), flex: 1, pointerEvents: 'auto' }}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      const r = doCalculate()
+                      if (!r) { alert('Помилка розрахунку. Поверніться назад і перевірте що вибрана категорія та вказана ринкова ціна.'); return }
+                      setResult(r)
+                      setStep(3)
+                    }}>
                     Розрахувати ціну →
                   </button>
                 </div>
