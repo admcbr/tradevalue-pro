@@ -177,6 +177,7 @@ export default function LeadsPage() {
                 ['Ціна викупу', selected.buy_price ? `₴${selected.buy_price.toLocaleString('uk-UA')}` : '—'],
                 ['Ім\'я клієнта', selected.client_name || '—'],
                 ['Телефон', selected.client_phone || '—'],
+                ['Месенджер', selected.messenger || '—'],
                 ['Дата', new Date(selected.created_at).toLocaleString('uk-UA')],
               ].map(([k, v]) => (
                 <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>

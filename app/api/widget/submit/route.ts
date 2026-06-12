@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     const { company_id, category_name, brand_name, model_name, condition,
             market_price, buy_price, sell_price, profit, profitability,
             status, field_values, completeness_values, explanation,
-            client_name, client_phone } = body
+            client_name, client_phone, messenger } = body
 
     if (!company_id || !category_name) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400, headers: CORS })
@@ -63,6 +63,7 @@ export async function POST(request: Request) {
         explanation: explanation || [],
         client_name: client_name || '',
         client_phone: client_phone || '',
+        messenger: messenger || '',
         lead_status: 'new',
       })
       .select()
