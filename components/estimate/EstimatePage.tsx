@@ -92,18 +92,21 @@ export default function EstimatePage() {
       return
     }
 
-    // Auto-save to Supabase
+    // Auto-save via server API (checks plan expiry + monthly limit)
     try {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: userRecord } = await supabase.from('users').select('id, name, company_id').eq('id', user.id).single()
-        if (userRecord?.company_id) {
-          const brand = activeCat.fields.find((f: any) => f.name === 'Бренд' || f.name === 'Виробник')
-          const model = activeCat.fields.find((f: any) => f.name === 'Модель' || f.name === 'Модель GPU' || f.name === 'Назва товару')
-          const { data: saved, error } = await supabase.from('estimations').insert({
-            company_id: userRecord.company_id,
-            user_id: user.id,
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        const brand = activeCat.fields.find((f: any) => f.name === 'Бренд' || f.name === 'Виробник')
+        const model = activeCat.fields.find((f: any) => f.name === 'Модель' || f.name === 'Модель GPU' || f.name === 'Назва товару')
+
+        const resp = await fetch('/api/estimate/save', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
             category_id: activeCat.id,
             category_name: activeCat.name,
             brand_name: brand ? fieldValues[brand.id] : '',
@@ -120,21 +123,24 @@ export default function EstimatePage() {
             field_values: fieldValues,
             completeness_values: completeness,
             comment,
-          }).select().single()
+          }),
+        })
 
-          if (error?.message?.includes('Plan limit')) {
-            setResult(null)
-            setLoading(false)
-            alert(lang === 'uk'
-              ? '❌ Ліміт оцінок вичерпано на цей місяць. Перейдіть на вищий тариф у розділі «Тарифи».'
-              : '❌ Лимит оценок исчерпан на этот месяц. Перейдите на более высокий тариф в разделе «Тарифы».')
-            return
-          }
-          if (saved) setSavedId(saved.id)
+        const data = await resp.json()
+
+        if (data.error === 'plan_limit_exceeded') {
+          setResult(null)
+          setLoading(false)
+          alert(lang === 'uk'
+            ? `❌ Ліміт оцінок вичерпано (${data.used}/${data.limit} на місяць). Перейдіть на вищий тариф у розділі «Тарифи».`
+            : `❌ Лимит оценок исчерпан (${data.used}/${data.limit} в месяц). Перейдите на более высокий тариф в разделе «Тарифы».`)
+          return
         }
+
+        if (data.id) setSavedId(data.id)
       }
     } catch(e) {
-      // Supabase not configured — continue without saving
+      // Network error — continue without saving
     }
 
     setLoading(false)
