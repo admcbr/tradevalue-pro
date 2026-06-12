@@ -46,7 +46,7 @@ function InvitePageInner() {
       .select('*, companies(*)')
       .eq('token', token)
       .eq('accepted', false)
-      .single()
+      .maybeSingle()
 
     if (error || !inv) { setStep('error'); return }
 
@@ -62,7 +62,7 @@ function InvitePageInner() {
       .from('users')
       .select('id')
       .eq('email', inv.email)
-      .single()
+      .maybeSingle()
 
     setStep(existingUser ? 'login' : 'register')
   }

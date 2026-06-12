@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       if (key in permissions) payload[key] = Boolean(permissions[key])
     }
 
-    const { data: existing } = await supabaseAdmin.from('user_permissions').select('id').eq('user_id', user_id).single()
+    const { data: existing } = await supabaseAdmin.from('user_permissions').select('id').eq('user_id', user_id).maybeSingle()
 
     let error
     if (existing) {

@@ -31,7 +31,7 @@ export default function HistoryPage() {
 
     if (user) {
       // Load from Supabase
-      const { data: userRecord } = await supabase.from('users').select('company_id').eq('id', user.id).single()
+      const { data: userRecord } = await supabase.from('users').select('company_id').eq('id', user.id).maybeSingle()
       if (userRecord?.company_id) {
         const { data: estimations } = await supabase
           .from('estimations')

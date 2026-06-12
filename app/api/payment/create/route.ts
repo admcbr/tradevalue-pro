@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       .from('users')
       .select('company_id, role')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()
 
     if (!userRecord?.company_id) {
       return NextResponse.json({ error: 'No company found' }, { status: 400 })
@@ -75,6 +75,7 @@ export async function POST(request: Request) {
           }],
         },
         redirectUrl: `${baseUrl}/payment/success?plan=${planKey}`,
+        failureRedirectUrl: `${baseUrl}/payment/cancel`,
         webhookUrl: `${baseUrl}/api/payment/webhook`,
         validity: 3600, // 1 hour
         paymentType: 'debit',

@@ -159,9 +159,9 @@ export default function PricingPage() {
     const supabase = createClient()
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return
-      const { data: ur } = await supabase.from('users').select('company_id').eq('id', user.id).single()
+      const { data: ur } = await supabase.from('users').select('company_id').eq('id', user.id).maybeSingle()
       if (!ur?.company_id) return
-      const { data: comp } = await supabase.from('companies').select('plan').eq('id', ur.company_id).single()
+      const { data: comp } = await supabase.from('companies').select('plan').eq('id', ur.company_id).maybeSingle()
       if (comp) {
         setCurrentPlan(comp.plan || 'starter')
         setPlanLimit(comp.plan === 'pro' ? 300 : comp.plan === 'business' ? 999999 : 5)
@@ -228,7 +228,7 @@ export default function PricingPage() {
             const supabase = createClient()
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) return
-            const { data: ur } = await supabase.from('users').select('company_id').eq('id', user.id).single()
+            const { data: ur } = await supabase.from('users').select('company_id').eq('id', user.id).maybeSingle()
             if (ur?.company_id) {
               await supabase.from('companies').update({ subscription_cancelled: true }).eq('id', ur.company_id)
             }

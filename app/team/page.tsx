@@ -113,7 +113,7 @@ export default function TeamPage() {
     const supabase = createClient()
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (user) {
-        const { data } = await supabase.from('users').select('company_id').eq('id', user.id).single()
+        const { data } = await supabase.from('users').select('company_id').eq('id', user.id).maybeSingle()
         if (data?.company_id) setCompanyId(data.company_id)
       }
     })
@@ -198,7 +198,7 @@ export default function TeamPage() {
     const supabase = createClient()
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return
-      const { data: userRecord } = await supabase.from('users').select('company_id').eq('id', user.id).single()
+      const { data: userRecord } = await supabase.from('users').select('company_id').eq('id', user.id).maybeSingle()
       if (userRecord?.company_id) {
         setCompanyId(userRecord.company_id)
         // Load members AND their saved permissions together
@@ -263,7 +263,7 @@ export default function TeamPage() {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const { data: ur } = await supabase.from('users').select('company_id').eq('id', user.id).single()
+    const { data: ur } = await supabase.from('users').select('company_id').eq('id', user.id).maybeSingle()
     if (!ur?.company_id) return
 
     const token = await getAuthToken()

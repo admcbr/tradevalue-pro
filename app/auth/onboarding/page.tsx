@@ -46,7 +46,7 @@ export default function OnboardingPage() {
       .from('users')
       .select('company_id, role')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()
 
     if (existingUser?.company_id) {
       // Already in a company — go directly to dashboard
@@ -59,7 +59,7 @@ export default function OnboardingPage() {
       .from('companies')
       .insert({ name: companyName.trim(), business_type: businessType, city })
       .select()
-      .single()
+      .maybeSingle()
 
     if (cErr) {
       setError('Помилка створення компанії: ' + cErr.message)

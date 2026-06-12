@@ -40,7 +40,7 @@ export default function LoginPage() {
         .from('users')
         .select('company_id')
         .eq('id', data.user.id)
-        .single()
+        .maybeSingle()
 
       if (userRecord?.company_id) {
         router.push('/dashboard')

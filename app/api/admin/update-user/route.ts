@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     )
 
     // Verify target user is in caller's company
-    const { data: targetUser } = await supabaseAdmin.from('users').select('company_id, role').eq('id', userId).single()
+    const { data: targetUser } = await supabaseAdmin.from('users').select('company_id, role').eq('id', userId).maybeSingle()
     if (!targetUser) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
     // Check company match (site admin can edit anyone)

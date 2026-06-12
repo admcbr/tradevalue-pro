@@ -18,7 +18,7 @@ export default function DashboardPage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        const { data: userRecord } = await supabase.from('users').select('company_id, name').eq('id', user.id).single()
+        const { data: userRecord } = await supabase.from('users').select('company_id, name').eq('id', user.id).maybeSingle()
         if (userRecord?.company_id) {
           const { data: est } = await supabase
             .from('estimations').select('*')
