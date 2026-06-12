@@ -8,6 +8,9 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 }
 
+// Fields never shown in widget (internal use only)
+const WIDGET_HIDDEN_FIELD_IDS = ['lf_water', 'lf_bios']
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const companyId = searchParams.get('company_id')
@@ -36,21 +39,33 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Widget requires Business plan' }, { status: 403, headers: CORS })
   }
 
-  const { data: rules } = await supabase
+  // Load company rules from DB
+  const { data: companyRules } = await supabase
     .from('company_rules')
     .select('*')
     .eq('company_id', companyId)
     .maybeSingle()
 
-  // Return full DEFAULT_CATEGORIES with fields + completeness
-  // In the future can be overridden by custom categories from DB
+  const buyPercent  = companyRules?.default_buy_percent  ?? 20
+  const sellPercent = companyRules?.default_sell_percent ?? 5
+  const minBuyPrice = companyRules?.min_buy_price        ?? 0
+  const maxBuyPrice = companyRules?.max_buy_price        ?? 999999
+  const minProfit   = companyRules?.min_profit           ?? 0
+  const minProfitability = companyRules?.min_profitability ?? 0
+
+  // Build categories — apply company rules to each category's rules
+  // and strip hidden fields
   const categories = DEFAULT_CATEGORIES.filter(c => c.is_active).map(cat => ({
-    id: cat.id,
-    name: cat.name,
-    icon: cat.icon,
-    completeness: cat.completeness,
-    fields: cat.fields,
-    rules: cat.rules,
+    ...cat,
+    fields: cat.fields.filter(f => !WIDGET_HIDDEN_FIELD_IDS.includes(f.id)),
+    // Override category rules with company rules
+    rules: {
+      ...cat.rules,
+      buy_percent:   buyPercent,
+      sell_percent:  sellPercent,
+      min_buy_price: minBuyPrice,
+      max_buy_price: maxBuyPrice,
+    },
   }))
 
   return NextResponse.json({
@@ -61,12 +76,13 @@ export async function GET(request: Request) {
       widget_color: company.widget_color || '#6382FF',
     },
     categories,
-    rules: rules || {
-      default_buy_percent: 20,
-      default_sell_percent: 5,
-      min_profit: 0,
-      min_profitability: 0,
-      min_buy_price: 0,
+    rules: {
+      default_buy_percent:  buyPercent,
+      default_sell_percent: sellPercent,
+      min_buy_price:        minBuyPrice,
+      max_buy_price:        maxBuyPrice,
+      min_profit:           minProfit,
+      min_profitability:    minProfitability,
     },
   }, { headers: CORS })
 }

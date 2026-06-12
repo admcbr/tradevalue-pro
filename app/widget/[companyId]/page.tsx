@@ -75,7 +75,7 @@ export default function WidgetPage() {
     if (!_price) { console.error('Widget: no price entered'); return null }
     // Remove internal __custom__ marker keys before passing to engine
     const cleanFields: Record<string,string> = {}
-    const HIDDEN_FIELDS = ['lf_water','lf_bios']
+    const HIDDEN_FIELDS = ['lf_water','lf_bios'] // also filtered server-side
     Object.entries(_fields).forEach(([k, v]) => {
       if (k.endsWith('__custom')) return  // skip helper keys
       if (v === '__custom__') return       // skip placeholder value
@@ -315,7 +315,7 @@ export default function WidgetPage() {
                 </div>
 
                 {cat && <>
-                  {cat.fields.filter(f => !['lf_water','lf_bios'].includes(f.id)).map(f => renderField(f))}
+                  {cat.fields.filter(f => !['lf_water','lf_bios'].includes(f.id) && f.name !== 'Сліди залиття' && f.name !== 'Пароль BIOS').map(f => renderField(f))}
 
                   <div>
                     <label style={lbl}>Ринкова ціна (₴) *</label>
@@ -327,7 +327,7 @@ export default function WidgetPage() {
 
                 <button style={btnPrimary(!cat)} onClick={() => {
                   if (!cat) return
-                  const missing = cat.fields.filter(f => !['lf_water','lf_bios'].includes(f.id) && f.is_required && !fields[f.id])
+                  const missing = cat.fields.filter(f => !['lf_water','lf_bios'].includes(f.id) && f.name !== 'Сліди залиття' && f.name !== 'Пароль BIOS' && f.is_required && !fields[f.id])
                   if (missing.length) { alert(`Заповніть обов'язкові поля:\n${missing.map(f => f.name).join('\n')}`); return }
                   if (!price || parseFloat(price) <= 0) { alert('Вкажіть ринкову ціну'); return }
                   setStep(2)
