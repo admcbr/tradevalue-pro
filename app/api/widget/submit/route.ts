@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     if (plan !== 'starter' && company.plan_expires_at && now > new Date(company.plan_expires_at)) {
       plan = 'starter'
     }
-    if (plan === 'starter') {
+    if (plan !== 'business') {
       return NextResponse.json({ error: 'Widget not available on this plan' }, { status: 403, headers: CORS })
     }
 

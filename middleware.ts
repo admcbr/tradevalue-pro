@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-const PUBLIC_PATHS = ['/', '/auth/login', '/auth/register', '/auth/callback', '/auth/reset', '/invite', '/terms', '/payment']
+const PUBLIC_PATHS = ['/', '/auth/login', '/auth/register', '/auth/callback', '/auth/reset', '/invite', '/terms', '/payment', '/widget']
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -28,6 +28,9 @@ export async function middleware(request: NextRequest) {
 
   // Admin panel handles own auth
   if (path.startsWith('/admin')) return supabaseResponse
+
+  // Widget — public (no auth required for embedded use)
+  if (path.startsWith('/widget') || path.startsWith('/api/widget')) return supabaseResponse
 
   // Public paths
   if (PUBLIC_PATHS.some(p => path === p || path.startsWith('/auth/'))) return supabaseResponse
