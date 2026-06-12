@@ -35,10 +35,18 @@ export async function middleware(request: NextRequest) {
   // Not logged in
   if (!user) return NextResponse.redirect(new URL('/auth/login', request.url))
 
+  // Helper: get role from metadata (fast) or DB (fallback)
+  async function getUserRole(): Promise<string> {
+    const metaRole = user.user_metadata?.role
+    if (metaRole) return metaRole
+    const { data: ur } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle()
+    return ur?.role || 'manager'
+  }
+
   // Pricing — owner only (no custom permission override)
   if (path.startsWith('/pricing')) {
-    const { data: ur } = await supabase.from('users').select('role').eq('id', user.id).single()
-    if (ur?.role !== 'owner') return NextResponse.redirect(new URL('/dashboard', request.url))
+    const role = await getUserRole()
+    if (role !== 'owner') return NextResponse.redirect(new URL('/dashboard', request.url))
     return supabaseResponse
   }
 
@@ -53,8 +61,7 @@ export async function middleware(request: NextRequest) {
   const matchedRoute = Object.keys(settingsRoutes).find(r => path.startsWith(r))
   if (matchedRoute) {
     const permKey = settingsRoutes[matchedRoute]
-    const { data: ur } = await supabase.from('users').select('role').eq('id', user.id).single()
-    const role = ur?.role || 'manager'
+    const role = await getUserRole()
 
     // Owner and admin always have access
     if (['owner', 'admin'].includes(role)) return supabaseResponse

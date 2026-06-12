@@ -76,6 +76,11 @@ export default function OnboardingPage() {
       company_id: company.id,
     })
 
+    // Save role + company_id to metadata for fast middleware checks (no DB call)
+    await supabase.auth.updateUser({
+      data: { role: 'owner', company_id: company.id }
+    })
+
     // Seed company rules
     await supabase.from('company_rules').insert({
       company_id: company.id,

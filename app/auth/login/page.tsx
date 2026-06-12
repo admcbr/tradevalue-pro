@@ -34,23 +34,26 @@ export default function LoginPage() {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) { setError(error.message === 'Invalid login credentials' ? 'Невірний email або пароль' : error.message); setLoading(false); return }
 
-    // Check if user has company setup
+    // Check if user has company setup — use metadata first (fast, no DB call)
     if (data.user) {
+      const meta = data.user.user_metadata
+      if (meta?.company_id) {
+        // Metadata has company_id — go directly, no extra DB call
+        router.push('/dashboard')
+        return
+      }
+
+      // Fallback: check DB (for older accounts without metadata)
       const { data: userRecord } = await supabase
         .from('users')
         .select('company_id')
         .eq('id', data.user.id)
         .maybeSingle()
 
-      if (userRecord?.company_id) {
-        router.push('/dashboard')
-      } else {
-        router.push('/auth/onboarding')
-      }
+      router.push(userRecord?.company_id ? '/dashboard' : '/auth/onboarding')
     } else {
       router.push('/dashboard')
     }
-    router.refresh()
   }
 
   return (
