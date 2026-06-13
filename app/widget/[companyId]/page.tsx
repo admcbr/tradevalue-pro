@@ -560,7 +560,6 @@ export default function WidgetPage() {
                   <p style={{ fontSize: 11, fontWeight: 700, color: C.muted2, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>Ваша заявка</p>
                   {[
                     ['Пристрій', `${cat?.name} · ${getBrand()} ${getModel()}`],
-                    !hidePrice ? ['Ціна викупу', `₴${result?.buy_price.toLocaleString('uk-UA')}`] : ['Ціна', 'Буде надіслана менеджером'],
                     ['Телефон', clientPhone],
                     messenger.length ? ['Месенджер', messenger.join(', ')] : null,
                   ].filter(Boolean).map(([k, v]: any) => (
@@ -569,10 +568,7 @@ export default function WidgetPage() {
                       <span style={{ color: C.text, fontWeight: 600, textAlign: 'right' }}>{v}</span>
                     </div>
                   ))}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, paddingTop: 10, borderTop: `1px solid ${C.border}`, marginTop: 4 }}>
-                    <span style={{ color: C.muted, fontWeight: 600 }}>Ціна викупу</span>
-                    <span style={{ fontWeight: 900, color: C.success, fontSize: 18 }}>₴{result?.buy_price.toLocaleString('uk-UA')}</span>
-                  </div>
+
                 </div>
 
                 <button onClick={reset} style={{ ...btnBack, justifyContent: 'center', width: '100%' }}>
