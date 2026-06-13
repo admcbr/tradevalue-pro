@@ -79,7 +79,7 @@ export async function GET(request: Request) {
       widget_title:    company.widget_title    || `Оцінка техніки — ${company.name}`,
       widget_color:    company.widget_color    || '#6382FF',
       widget_bg_color: company.widget_bg_color || '#07070C',
-      widget_hide_price: company.widget_hide_price ?? false,
+      widget_hide_price: true, // always hide price — contact form first
     },
     categories,
     rules: { default_buy_percent: buyPercent, default_sell_percent: sellPercent, min_buy_price: minBuyPrice, max_buy_price: maxBuyPrice, min_profit: minProfit, min_profitability: minProfitability },

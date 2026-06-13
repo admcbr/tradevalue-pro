@@ -78,7 +78,7 @@ export default function LeadsPage() {
     await fetch('/api/widget/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-      body: JSON.stringify({ widget_title: wTitle, widget_color: wColor, widget_bg_color: wBg, widget_hide_price: wHidePrice }),
+      body: JSON.stringify({ widget_title: wTitle, widget_color: wColor, widget_bg_color: wBg }),
     })
     setSaving(false); setSaveOk(true)
     setTimeout(() => setSaveOk(false), 2500)
