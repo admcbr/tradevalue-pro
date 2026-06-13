@@ -8,8 +8,8 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 }
 
-// Fields never shown in widget (internal use only)
 const WIDGET_HIDDEN_FIELD_IDS = ['lf_water', 'lf_bios']
+const WIDGET_HIDDEN_FIELD_NAMES = ['Сліди залиття', 'Пароль BIOS']
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -24,11 +24,16 @@ export async function GET(request: Request) {
 
   const { data: company } = await supabase
     .from('companies')
-    .select('id, name, plan, plan_expires_at, widget_title, widget_color')
+    .select('id, name, plan, plan_expires_at, widget_title, widget_color, widget_bg_color, widget_hide_price, widget_disabled')
     .eq('id', companyId)
     .maybeSingle()
 
   if (!company) return NextResponse.json({ error: 'Company not found' }, { status: 404, headers: CORS })
+
+  // Admin can disable widget for specific company
+  if (company.widget_disabled) {
+    return NextResponse.json({ error: 'Widget is disabled for this company' }, { status: 403, headers: CORS })
+  }
 
   const now = new Date()
   let plan = company.plan || 'starter'
@@ -39,26 +44,25 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Widget requires Business plan' }, { status: 403, headers: CORS })
   }
 
-  // Load company rules from DB
   const { data: companyRules } = await supabase
     .from('company_rules')
     .select('*')
     .eq('company_id', companyId)
     .maybeSingle()
 
-  const buyPercent  = companyRules?.default_buy_percent  ?? 20
-  const sellPercent = companyRules?.default_sell_percent ?? 5
-  const minBuyPrice = companyRules?.min_buy_price        ?? 0
-  const maxBuyPrice = companyRules?.max_buy_price        ?? 999999
-  const minProfit   = companyRules?.min_profit           ?? 0
-  const minProfitability = companyRules?.min_profitability ?? 0
+  const buyPercent       = companyRules?.default_buy_percent  ?? 20
+  const sellPercent      = companyRules?.default_sell_percent ?? 5
+  const minBuyPrice      = companyRules?.min_buy_price        ?? 0
+  const maxBuyPrice      = companyRules?.max_buy_price        ?? 999999
+  const minProfit        = companyRules?.min_profit           ?? 0
+  const minProfitability = companyRules?.min_profitability    ?? 0
 
-  // Build categories — apply company rules to each category's rules
-  // and strip hidden fields
   const categories = DEFAULT_CATEGORIES.filter(c => c.is_active).map(cat => ({
     ...cat,
-    fields: cat.fields.filter(f => !WIDGET_HIDDEN_FIELD_IDS.includes(f.id)),
-    // Override category rules with company rules
+    fields: cat.fields.filter(f =>
+      !WIDGET_HIDDEN_FIELD_IDS.includes(f.id) &&
+      !WIDGET_HIDDEN_FIELD_NAMES.includes(f.name)
+    ),
     rules: {
       ...cat.rules,
       buy_percent:   buyPercent,
@@ -72,18 +76,13 @@ export async function GET(request: Request) {
     company: {
       id: company.id,
       name: company.name,
-      widget_title: company.widget_title || `Оцінка техніки — ${company.name}`,
-      widget_color: company.widget_color || '#6382FF',
+      widget_title:    company.widget_title    || `Оцінка техніки — ${company.name}`,
+      widget_color:    company.widget_color    || '#6382FF',
+      widget_bg_color: company.widget_bg_color || '#07070C',
+      widget_hide_price: company.widget_hide_price ?? false,
     },
     categories,
-    rules: {
-      default_buy_percent:  buyPercent,
-      default_sell_percent: sellPercent,
-      min_buy_price:        minBuyPrice,
-      max_buy_price:        maxBuyPrice,
-      min_profit:           minProfit,
-      min_profitability:    minProfitability,
-    },
+    rules: { default_buy_percent: buyPercent, default_sell_percent: sellPercent, min_buy_price: minBuyPrice, max_buy_price: maxBuyPrice, min_profit: minProfit, min_profitability: minProfitability },
   }, { headers: CORS })
 }
 

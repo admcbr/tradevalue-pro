@@ -7,7 +7,7 @@ import type { Category, EstimationResult } from '@/lib/types'
 import { calculate } from '@/lib/engine'
 
 interface Config {
-  company: { id: string; name: string; widget_title: string; widget_color: string }
+  company: { id: string; name: string; widget_title: string; widget_color: string; widget_bg_color: string; widget_hide_price: boolean }
   categories: Category[]
   rules: any
 }
@@ -59,8 +59,10 @@ export default function WidgetPage() {
   }, [companyId])
 
   const accent = config?.company.widget_color || '#6382FF'
+  const bgColor = config?.company.widget_bg_color || '#07070C'
+  const hidePrice = config?.company.widget_hide_price ?? false
   const C = {
-    bg: '#07070C', card: '#0E0E18', card2: '#141422',
+    bg: bgColor, card: '#0E0E18', card2: '#141422',
     border: '#1E1E32', border2: '#282840',
     text: '#F0F0F8', muted: '#8888AA', muted2: '#4A4A68',
     success: '#34D98A', danger: '#F87171', warning: '#FBBF24',
@@ -426,13 +428,20 @@ export default function WidgetPage() {
                     </div>
 
                     {/* Price block */}
-                    <div style={{ background: `linear-gradient(135deg,${accent}1A,${accent}08)`, border: `1px solid ${accent}33`, borderRadius: 18, padding: '24px 20px', textAlign: 'center' }}>
-                      <p style={{ fontSize: 12, color: C.muted, marginBottom: 4 }}>Орієнтовна ціна викупу</p>
-                      <p style={{ fontSize: 48, fontWeight: 900, color: accent, letterSpacing: -3, lineHeight: 1, margin: '0 0 8px' }}>
-                        ₴{result.buy_price.toLocaleString('uk-UA')}
-                      </p>
-                      <p style={{ fontSize: 12, color: C.muted2 }}>{getBrand()} {getModel()} · {cat?.name}</p>
-                    </div>
+                    {!hidePrice ? (
+                      <div style={{ background: `linear-gradient(135deg,${accent}1A,${accent}08)`, border: `1px solid ${accent}33`, borderRadius: 18, padding: '24px 20px', textAlign: 'center' }}>
+                        <p style={{ fontSize: 12, color: C.muted, marginBottom: 4 }}>Орієнтовна ціна викупу</p>
+                        <p style={{ fontSize: 48, fontWeight: 900, color: accent, letterSpacing: -3, lineHeight: 1, margin: '0 0 8px' }}>
+                          ₴{result.buy_price.toLocaleString('uk-UA')}
+                        </p>
+                        <p style={{ fontSize: 12, color: C.muted2 }}>{getBrand()} {getModel()} · {cat?.name}</p>
+                      </div>
+                    ) : (
+                      <div style={{ background: `linear-gradient(135deg,${accent}1A,${accent}08)`, border: `1px solid ${accent}33`, borderRadius: 18, padding: '24px 20px', textAlign: 'center' }}>
+                        <p style={{ fontSize: 28, fontWeight: 900, color: C.text, marginBottom: 8 }}>✅ Пристрій підходить!</p>
+                        <p style={{ fontSize: 14, color: C.muted }}>Залиште контакт — менеджер надішле точну ціну викупу</p>
+                      </div>
+                    )}
 
                     {/* Explanation */}
                     {result.explanation.length > 0 && (
@@ -449,14 +458,25 @@ export default function WidgetPage() {
                     </p>
 
                     {/* CTA */}
-                    <button onClick={() => setStep(4)} style={{
-                      ...btnPrimary(),
-                      padding: '16px', fontSize: 16,
-                      background: 'linear-gradient(135deg,#22c55e,#16a34a)',
-                      boxShadow: '0 0 32px rgba(34,197,94,0.3)',
-                    }}>
-                      <Send size={17} /> Здати за ₴{result.buy_price.toLocaleString('uk-UA')}
-                    </button>
+                    {hidePrice ? (
+                      <button onClick={() => setStep(4)} style={{
+                        ...btnPrimary(),
+                        padding: '16px', fontSize: 16,
+                        background: 'linear-gradient(135deg,#22c55e,#16a34a)',
+                        boxShadow: '0 0 32px rgba(34,197,94,0.3)',
+                      }}>
+                        <Send size={17} /> Дізнатись ціну викупу
+                      </button>
+                    ) : (
+                      <button onClick={() => setStep(4)} style={{
+                        ...btnPrimary(),
+                        padding: '16px', fontSize: 16,
+                        background: 'linear-gradient(135deg,#22c55e,#16a34a)',
+                        boxShadow: '0 0 32px rgba(34,197,94,0.3)',
+                      }}>
+                        <Send size={17} /> Здати за ₴{result.buy_price.toLocaleString('uk-UA')}
+                      </button>
+                    )}
 
                     <button onClick={() => setStep(1)} style={{ ...btnBack, justifyContent: 'center', width: '100%' }}>
                       ← Оцінити інший пристрій
@@ -480,7 +500,8 @@ export default function WidgetPage() {
                 {/* Price reminder */}
                 <div style={{ background: `${accent}10`, border: `1px solid ${accent}22`, borderRadius: 12, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                   <span style={{ fontSize: 13, color: C.muted }}>{cat?.name} · {getBrand()} {getModel()}</span>
-                  <span style={{ fontSize: 18, fontWeight: 900, color: accent }}>₴{result?.buy_price.toLocaleString('uk-UA')}</span>
+                  {!hidePrice && <span style={{ fontSize: 18, fontWeight: 900, color: accent }}>₴{result?.buy_price.toLocaleString('uk-UA')}</span>}
+                  {hidePrice && <span style={{ fontSize: 13, color: C.muted }}>Ціна буде надіслана</span>}
                 </div>
 
                 <div>
@@ -539,6 +560,7 @@ export default function WidgetPage() {
                   <p style={{ fontSize: 11, fontWeight: 700, color: C.muted2, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>Ваша заявка</p>
                   {[
                     ['Пристрій', `${cat?.name} · ${getBrand()} ${getModel()}`],
+                    !hidePrice ? ['Ціна викупу', `₴${result?.buy_price.toLocaleString('uk-UA')}`] : ['Ціна', 'Буде надіслана менеджером'],
                     ['Телефон', clientPhone],
                     messenger.length ? ['Месенджер', messenger.join(', ')] : null,
                   ].filter(Boolean).map(([k, v]: any) => (

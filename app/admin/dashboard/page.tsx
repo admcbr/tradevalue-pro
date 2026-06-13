@@ -85,6 +85,11 @@ export default function AdminDashboard() {
     setCompanies(prev => prev.map(c => c.id === id ? { ...c, plan } : c))
   }
 
+  async function toggleWidgetDisabled(id: string, current: boolean) {
+    await supabase.from('companies').update({ widget_disabled: !current }).eq('id', id)
+    setCompanies(prev => prev.map(c => c.id === id ? { ...c, widget_disabled: !current } : c))
+  }
+
   async function updateCompanyField(id: string, field: string, value: string) {
     await supabase.from('companies').update({ [field]: value }).eq('id', id)
     setCompanies(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c))
@@ -331,6 +336,9 @@ export default function AdminDashboard() {
                               {plan}
                             </button>
                           ))}
+                          <button onClick={() => toggleWidgetDisabled(c.id, c.widget_disabled)} style={{ padding:'4px 10px', borderRadius:6, border:`1px solid ${c.widget_disabled ? '#34D98A40' : '#F8711440'}`, background:c.widget_disabled ? 'rgba(52,217,138,0.1)' : 'rgba(248,113,113,0.1)', color:c.widget_disabled ? '#34D98A' : '#F87114', fontFamily:'inherit', fontSize:11, fontWeight:700, cursor:'pointer' }}>
+                            {c.widget_disabled ? '✅ Віджет вкл' : '🚫 Вимк. віджет'}
+                          </button>
                         </div>
                       </td>
                       <td style={td}>
