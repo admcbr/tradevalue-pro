@@ -438,7 +438,7 @@ export default function WidgetPage() {
                       </div>
                     ) : (
                       <div style={{ background: `linear-gradient(135deg,${accent}1A,${accent}08)`, border: `1px solid ${accent}33`, borderRadius: 18, padding: '24px 20px', textAlign: 'center' }}>
-                        <p style={{ fontSize: 28, fontWeight: 900, color: C.text, marginBottom: 8 }}>✅ Пристрій підходить!</p>
+                        <p style={{ fontSize: 26, fontWeight: 900, color: C.text, marginBottom: 8 }}>📋 Оцінка готова</p>
                         <p style={{ fontSize: 14, color: C.muted }}>Залиште контакт — менеджер надішле точну ціну викупу</p>
                       </div>
                     )}
