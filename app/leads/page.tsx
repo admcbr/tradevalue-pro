@@ -34,7 +34,6 @@ export default function LeadsPage() {
   const [wTitle, setWTitle]     = useState('')
   const [wColor, setWColor]     = useState('#6382FF')
   const [wBg, setWBg]           = useState('#07070C')
-  const [wHidePrice, setWHidePrice] = useState(false)
   const [saving, setSaving]     = useState(false)
   const [saveOk, setSaveOk]     = useState(false)
 
@@ -60,13 +59,12 @@ export default function LeadsPage() {
     // Load widget settings
     const { data: comp } = await supabase
       .from('companies')
-      .select('name, widget_title, widget_color, widget_bg_color, widget_hide_price')
+      .select('name, widget_title, widget_color, widget_bg_color')
       .eq('id', ur.company_id).maybeSingle()
     if (comp) {
       setWTitle(comp.widget_title || `Оцінка техніки — ${comp.name}`)
       setWColor(comp.widget_color || '#6382FF')
       setWBg(comp.widget_bg_color || '#07070C')
-      setWHidePrice(comp.widget_hide_price ?? false)
     }
     setLoading(false)
   }
@@ -226,29 +224,7 @@ export default function LeadsPage() {
               </div>
             </div>
 
-            {/* Behavior */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 18, padding: 24 }}>
-                <p style={{ fontSize: 15, fontWeight: 800, color: C.text, marginBottom: 16 }}>⚙️ Поведінка</p>
-
-                {/* Hide price toggle */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-                  <div>
-                    <p style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 4 }}>Приховати ціну від клієнта</p>
-                    <p style={{ fontSize: 12, color: C.muted2, lineHeight: 1.6 }}>Клієнт не бачить ціну — одразу залишає контакт, ціну надсилає менеджер. Захищає від перекупів.</p>
-                  </div>
-                  <button onClick={() => setWHidePrice(p => !p)} style={{ width: 48, height: 26, borderRadius: 13, border: 'none', background: wHidePrice ? C.accent : C.border2, cursor: 'pointer', position: 'relative', flexShrink: 0, transition: 'background .2s' }}>
-                    <div style={{ width: 20, height: 20, borderRadius: 10, background: '#fff', position: 'absolute', top: 3, left: wHidePrice ? 25 : 3, transition: 'left .2s' }} />
-                  </button>
-                </div>
-
-                {wHidePrice && (
-                  <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 10, background: 'rgba(99,130,255,0.06)', border: '1px solid rgba(99,130,255,0.15)' }}>
-                    <p style={{ fontSize: 12, color: C.muted }}>✅ Клієнт побачить: <b style={{ color: C.text }}>"Залиште контакт — менеджер надішле ціну"</b></p>
-                  </div>
-                )}
-              </div>
-
               {/* Preview */}
               <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 18, padding: 24 }}>
                 <p style={{ fontSize: 15, fontWeight: 800, color: C.text, marginBottom: 12 }}>👁 Превʼю</p>
