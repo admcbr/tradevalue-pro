@@ -47,6 +47,34 @@ export async function middleware(request: NextRequest) {
     return ur?.role || 'manager'
   }
 
+  // Trial expiry check — only for owner on non-pricing/support paths
+  if (!path.startsWith('/pricing') && !path.startsWith('/trial-expired') && !path.startsWith('/support')) {
+    const role = user.user_metadata?.role
+    if (role === 'owner') {
+      const companyId = user.user_metadata?.company_id
+      if (companyId) {
+        const { data: comp } = await supabase
+          .from('companies')
+          .select('plan, trial_ends_at, plan_expires_at')
+          .eq('id', companyId)
+          .maybeSingle()
+
+        if (comp) {
+          const now = new Date()
+          const plan = comp.plan || 'starter'
+          // Starter with expired trial
+          if (plan === 'starter' && comp.trial_ends_at && now > new Date(comp.trial_ends_at)) {
+            return NextResponse.redirect(new URL('/trial-expired', request.url))
+          }
+          // Paid plan expired
+          if (plan !== 'starter' && comp.plan_expires_at && now > new Date(comp.plan_expires_at)) {
+            return NextResponse.redirect(new URL('/trial-expired', request.url))
+          }
+        }
+      }
+    }
+  }
+
   // Pricing — owner only (no custom permission override)
   if (path.startsWith('/pricing')) {
     const role = await getUserRole()

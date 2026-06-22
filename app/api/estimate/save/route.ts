@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
 const PLAN_LIMITS: Record<string, number> = {
-  starter:  5,
+  starter:  999999, // full access during 3-day trial
   pro:      300,
   business: 999999,
 }
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
 
     const { data: company } = await supabaseAdmin
       .from('companies')
-      .select('plan, plan_expires_at, estimations_this_month')
+      .select('plan, plan_expires_at, trial_ends_at, estimations_this_month')
       .eq('id', userRecord.company_id)
       .maybeSingle()
 
@@ -48,11 +48,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Company not found' }, { status: 400 })
     }
 
-    // Check plan expiry — downgrade to starter if expired
+    // Check plan expiry
     const now = new Date()
     let effectivePlan = company.plan || 'starter'
 
-    if (effectivePlan !== 'starter' && company.plan_expires_at) {
+    if (effectivePlan === 'starter' && (company as any).trial_ends_at) {
+      // Trial expired — block completely
+      if (now > new Date((company as any).trial_ends_at)) {
+        return NextResponse.json({ error: 'trial_expired' }, { status: 403 })
+      }
+    } else if (effectivePlan !== 'starter' && company.plan_expires_at) {
       const expiresAt = new Date(company.plan_expires_at)
       if (now > expiresAt) {
         effectivePlan = 'starter'
