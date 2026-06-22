@@ -372,8 +372,8 @@ export default function PricingPage() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <button
-                onClick={() => handlePayment(selected!)}
-                disabled={!!payLoading}
+                onClick={() => { if (selected !== 'starter') handlePayment(selected!) }}
+                disabled={!!payLoading || selected === 'starter'}
                 style={{
                   padding: '13px', borderRadius: 10, border: 'none',
                   background: payLoading ? C.border2 : 'linear-gradient(135deg,#6382FF,#A78BFA)',
@@ -383,9 +383,11 @@ export default function PricingPage() {
                   boxShadow: payLoading ? 'none' : '0 0 24px rgba(99,130,255,0.3)',
                   opacity: payLoading ? 0.7 : 1,
                 }}>
-                {payLoading
-                  ? <><span style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin .8s linear infinite', display: 'inline-block' }} />{isUk ? 'Відкриваємо оплату...' : 'Открываем оплату...'}</>
-                  : <>💳 {isUk ? 'Оплатити через Monobank' : 'Оплатить через Monobank'}</>
+                {selected === 'starter'
+                  ? (isUk ? '✓ Вже активовано' : '✓ Уже активировано')
+                  : payLoading
+                    ? <><span style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin .8s linear infinite', display: 'inline-block' }} />{isUk ? 'Відкриваємо оплату...' : 'Открываем оплату...'}</>
+                    : <>💳 {isUk ? 'Оплатити через Monobank' : 'Оплатить через Monobank'}</>
                 }
               </button>
               <button onClick={() => { setSelected(null); setPayLoading(null) }} disabled={!!payLoading} style={{ padding: '11px', borderRadius: 10, border: 'none', background: 'transparent', color: payLoading ? C.muted2 : C.muted, fontFamily: 'inherit', fontSize: 13, cursor: payLoading ? 'not-allowed' : 'pointer', opacity: payLoading ? 0.4 : 1 }}>
