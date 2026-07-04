@@ -29,6 +29,7 @@ export interface EstimationInput {
   field_values: Record<string, string>      // field_id → value or option name
   completeness_present: string[]            // ids of completeness items PRESENT
   market_price: number
+  company_price_ranges?: { id: string; from: number; to: number; buy_percent: number }[]
   eval_type: 'buyout' | 'tradein'
   tradein_bonus_percent: number
 }
@@ -59,7 +60,16 @@ export function calculate(input: EstimationInput): EstimationResult {
   }
 
   // ── Buy percent ──────────────────────────────────────────────────────────────
+  // Apply price range override from company rules if available
   let buyPct = rules.buy_percent
+  if (input.company_price_ranges && input.company_price_ranges.length > 0) {
+    const matchedRange = input.company_price_ranges
+      .filter(r => market_price >= r.from && (r.to === 0 || market_price < r.to))
+      .sort((a, b) => b.from - a.from)[0]
+    if (matchedRange) {
+      buyPct = matchedRange.buy_percent
+    }
+  }
   if (eval_type === 'tradein' && tradein_bonus_percent > 0) {
     buyPct = Math.max(0, buyPct - tradein_bonus_percent)
     explanation.push(`Тип: Трейд-Ін — купуємо на ${buyPct}% нижче ринку (+${tradein_bonus_percent}% бонус клієнту).`)

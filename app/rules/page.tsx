@@ -42,6 +42,7 @@ export default function RulesPage() {
 
   const [rules, setRules] = useState({ default_buy_percent:20, default_sell_percent:5, min_profit:2500, min_profitability:15, max_buy_price:50000, min_buy_price:3000, max_market_price:80000, min_market_price:2000 })
   const [catRules, setCatRules] = useState<Array<{id:string;category:string;buy_percent:number;is_enabled:boolean}>>([])
+  const [priceRanges, setPriceRanges] = useState<Array<{id:string;from:number;to:number;buy_percent:number}>>([])
   const [saved, setSaved] = useState(false)
   const [tradeInType, setTradeInType] = useState<'percent'|'fixed'>('percent')
   const [tradeInPercent, setTradeInPercent] = useState(5)
@@ -130,6 +131,16 @@ export default function RulesPage() {
       buy_percent: c.rules?.buy_percent ?? 20, is_enabled: true,
     })))
   }, [])
+
+  function addPriceRange() {
+    setPriceRanges(p => [...p, { id: Date.now().toString(), from: 0, to: 0, buy_percent: 20 }])
+  }
+  function removePriceRange(id: string) {
+    setPriceRanges(p => p.filter(r => r.id !== id))
+  }
+  function updatePriceRange(id: string, key: string, val: string) {
+    setPriceRanges(p => p.map(r => r.id === id ? { ...r, [key]: parseFloat(val) || 0 } : r))
+  }
 
   function updateRule(key: keyof typeof rules, val: string) {
     setRules(r => ({ ...r, [key]: parseFloat(val) || 0 }))
@@ -503,7 +514,83 @@ export default function RulesPage() {
         </div>
       </Card>
 
-      <button onClick={() => { setSaved(true); setTimeout(()=>setSaved(false),2500) }} style={{
+      {/* ── Price Ranges Block ── */}
+      <Card>
+        <SectionLabel>{isUk ? '📊 Цінові діапазони (відсоток від ринкової ціни)' : '📊 Ценовые диапазоны (процент от рыночной цены)'}</SectionLabel>
+        <p style={{ fontSize:12, color:'#8080AA', marginBottom:16, lineHeight:1.6 }}>
+          {isUk
+            ? 'Задайте різні відсотки викупу залежно від ринкової ціни пристрою. Якщо ціна потрапляє в діапазон — він замінює базовий відсоток. Якщо діапазони не задані — використовується базовий відсоток.'
+            : 'Задайте разные проценты выкупа в зависимости от рыночной цены. Если цена попадает в диапазон — он заменяет базовый процент.'}
+        </p>
+
+        {priceRanges.length === 0 && (
+          <p style={{ fontSize:13, color:'#4A4A70', textAlign:'center', padding:'16px 0' }}>
+            {isUk ? 'Діапазони не задані — використовується базовий відсоток' : 'Диапазоны не заданы — используется базовый процент'}
+          </p>
+        )}
+
+        {priceRanges.map((range, idx) => (
+          <div key={range.id} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10, flexWrap:'wrap' }}>
+            <span style={{ fontSize:12, color:'#8080AA', minWidth:24, textAlign:'center' }}>#{idx+1}</span>
+
+            <div style={{ display:'flex', alignItems:'center', gap:6, flex:1, minWidth:200 }}>
+              <span style={{ fontSize:12, color:'#8080AA', whiteSpace:'nowrap' }}>{isUk ? 'Від ₴' : 'От ₴'}</span>
+              <input type="number" value={range.from || ''}
+                onChange={e => updatePriceRange(range.id, 'from', e.target.value)}
+                placeholder="0"
+                style={{ width:90, padding:'7px 10px', borderRadius:8, border:'1px solid #282840', background:'#141422', color:'#EDEDF0', fontFamily:'inherit', fontSize:13, outline:'none' }} />
+              <span style={{ fontSize:12, color:'#8080AA', whiteSpace:'nowrap' }}>{isUk ? 'до ₴' : 'до ₴'}</span>
+              <input type="number" value={range.to || ''}
+                onChange={e => updatePriceRange(range.id, 'to', e.target.value)}
+                placeholder={isUk ? '0 = без ліміту' : '0 = без лимита'}
+                style={{ width:110, padding:'7px 10px', borderRadius:8, border:'1px solid #282840', background:'#141422', color:'#EDEDF0', fontFamily:'inherit', fontSize:13, outline:'none' }} />
+            </div>
+
+            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <span style={{ fontSize:12, color:'#8080AA', whiteSpace:'nowrap' }}>{isUk ? 'Відсоток' : 'Процент'}</span>
+              <input type="number" value={range.buy_percent}
+                onChange={e => updatePriceRange(range.id, 'buy_percent', e.target.value)}
+                style={{ width:70, padding:'7px 10px', borderRadius:8, border:'1px solid #282840', background:'#141422', color:'#EDEDF0', fontFamily:'inherit', fontSize:13, outline:'none' }} />
+              <span style={{ fontSize:12, color:'#8080AA' }}>%</span>
+            </div>
+
+            <div style={{ fontSize:11, color:'#34D98A', background:'rgba(52,217,138,0.08)', padding:'4px 10px', borderRadius:6, whiteSpace:'nowrap' }}>
+              {isUk ? 'Викуп: ' : 'Выкуп: '}
+              {range.from > 0 ? `₴${Math.round(range.from * range.buy_percent / 100).toLocaleString('uk-UA')}` : '—'}
+              {range.from > 0 && range.to > 0 ? ` – ₴${Math.round(range.to * range.buy_percent / 100).toLocaleString('uk-UA')}` : ''}
+            </div>
+
+            <button onClick={() => removePriceRange(range.id)}
+              style={{ padding:'6px 10px', borderRadius:8, border:'1px solid rgba(248,113,113,0.3)', background:'rgba(248,113,113,0.08)', color:'#F87171', fontFamily:'inherit', fontSize:12, cursor:'pointer' }}>
+              ✕
+            </button>
+          </div>
+        ))}
+
+        <button onClick={addPriceRange} style={{ marginTop:8, padding:'8px 18px', borderRadius:9, border:'1px dashed #282840', background:'transparent', color:'#8080AA', fontFamily:'inherit', fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>
+          + {isUk ? 'Додати діапазон' : 'Добавить диапазон'}
+        </button>
+
+        {priceRanges.length > 0 && (
+          <div style={{ marginTop:16, padding:'12px 16px', borderRadius:10, background:'rgba(99,130,255,0.06)', border:'1px solid rgba(99,130,255,0.15)' }}>
+            <p style={{ fontSize:12, color:'#8080AA', marginBottom:6, fontWeight:600 }}>{isUk ? 'Приклад для ₴15,000:' : 'Пример для ₴15,000:'}</p>
+            {(() => {
+              const match = priceRanges.filter(r => 15000 >= r.from && (r.to === 0 || 15000 < r.to)).sort((a,b) => b.from - a.from)[0]
+              return match
+                ? <p style={{ fontSize:13, color:'#EDEDF0' }}>Діапазон ₴{match.from.toLocaleString('uk-UA')} – {match.to > 0 ? `₴${match.to.toLocaleString('uk-UA')}` : '∞'} → <b style={{ color:'#34D98A' }}>{match.buy_percent}%</b> = ₴{Math.round(15000 * match.buy_percent / 100).toLocaleString('uk-UA')}</p>
+                : <p style={{ fontSize:13, color:'#8080AA' }}>{isUk ? 'Не потрапляє в жоден діапазон — використається базовий відсоток' : 'Не попадает ни в один диапазон — используется базовый процент'}</p>
+            })()}
+          </div>
+        )}
+      </Card>
+
+      <button onClick={() => {
+        // Save rules to localStorage
+        import('@/lib/store').then(({ saveCompanyRules }) => {
+          saveCompanyRules({ ...rules, price_ranges: priceRanges } as any)
+        })
+        setSaved(true); setTimeout(()=>setSaved(false),2500)
+      }} style={{
         display:'flex', alignItems:'center', gap:10, padding:'12px 28px', borderRadius:12,
         background: saved ? 'rgba(52,217,138,0.15)' : 'linear-gradient(135deg,#6382FF,#A78BFA)',
         border: saved ? '1px solid rgba(52,217,138,0.3)' : 'none',

@@ -81,7 +81,10 @@ export default function EstimatePage() {
     setLoading(true); setResult(null); setSavedId('')
 
     // Calculate result
-    const res = calculate({ category: activeCat, field_values: fieldValues, completeness_present: completeness, market_price: price, eval_type: evalType, tradein_bonus_percent: 5 })
+    // Load price_ranges from company rules for tiered pricing
+    const { getCompanyRules } = await import('@/lib/store')
+    const companyRules = getCompanyRules()
+    const res = calculate({ category: activeCat, field_values: fieldValues, completeness_present: completeness, market_price: price, eval_type: evalType, tradein_bonus_percent: 5, company_price_ranges: (companyRules as any).price_ranges || [] })
     setResult(res)
 
     // Only save if calculation was successful (not blocked by missing fields)

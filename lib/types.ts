@@ -72,6 +72,13 @@ export interface CategoryRules {
   max_market_price: number
 }
 
+export interface PriceRange {
+  id: string
+  from: number        // min market price (0 = no limit)
+  to: number          // max market price (0 = no limit)
+  buy_percent: number // override buy percent for this range
+}
+
 export interface CompanyRules {
   default_buy_percent: number
   default_sell_percent: number
@@ -79,6 +86,7 @@ export interface CompanyRules {
   max_buy_price: number
   min_market_price: number
   max_market_price: number
+  price_ranges?: PriceRange[]  // optional tiered buy percent by market price
 }
 
 // ─── Estimation ──────────────────────────────────────────────────────────────
