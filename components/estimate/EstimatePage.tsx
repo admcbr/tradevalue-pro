@@ -29,6 +29,16 @@ export default function EstimatePage() {
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({})
   const [completeness, setCompleteness] = useState<string[]>([])   // present item ids
   const [marketPrice, setMarketPrice] = useState('')
+  const [aiPrices, setAiPrices] = useState<{
+    new_price: number|null; used_price: number|null; avg_resale_price: number|null
+    price_range_used: string; popularity: string; popularity_reason: string
+    days_to_sell: string; recommendation: string; recommendation_text: string
+    margin_estimate: string; risks: string; market_trend: string
+    sources_new: string[]; sources_used: string[]; tip: string
+    device: string; condition: string
+  }|null>(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState('')
   const [comment, setComment] = useState('')
   const [result, setResult] = useState<EstimationResult | null>(null)
   const [loading, setLoading] = useState(false)
@@ -56,6 +66,39 @@ export default function EstimatePage() {
   function toggleComplItem(id: string) {
     setCompleteness(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
     setResult(null); setSavedId('')
+  }
+
+  async function fetchAiPrices() {
+    if (!activeCat) return
+    const brandField = activeCat.fields.find(f => f.name === 'Бренд' || f.name === 'Виробник')
+    const modelField = activeCat.fields.find(f => f.name === 'Модель' || f.name === 'Модель GPU' || f.name === 'Назва товару')
+    const brand = brandField ? fieldValues[brandField.id] : ''
+    const model = modelField ? fieldValues[modelField.id] : ''
+    if (!brand || !model) {
+      setAiError('Спочатку вкажіть Бренд і Модель')
+      return
+    }
+    setAiLoading(true)
+    setAiError('')
+    setAiPrices(null)
+    // Get current condition from field values
+    const condField = activeCat.fields.find((f: any) => f.name === 'Стан' || f.id === 'condition')
+    const condition = condField ? fieldValues[condField.id] : ''
+
+    try {
+      const res = await fetch('/api/ai/market-price', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brand, model, category: activeCat.name, condition }),
+      })
+      const data = await res.json()
+      if (data.error) { setAiError(data.error); return }
+      setAiPrices(data)
+    } catch (e: any) {
+      setAiError('Помилка зв\'язку з AI')
+    } finally {
+      setAiLoading(false)
+    }
   }
 
   async function handleCalculate() {
@@ -266,15 +309,18 @@ export default function EstimatePage() {
 
             {/* Ринкова ціна */}
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 24 }}>
-              <div>
+              <div style={{ marginBottom: 8 }}>
                 <span style={label}>Ринкова ціна (₴) *</span>
-                <input type="number" style={{ ...field, fontSize: 20, fontWeight: 700, padding: '12px 16px' }}
-                  placeholder="наприклад 28000"
-                  value={marketPrice} onChange={e => { setMarketPrice(e.target.value); setResult(null); setSavedId('') }} />
-                <p style={{ fontSize: 11, color: C.muted2, marginTop: 6 }}>
-                  Ліміти: {formatMoney(activeCat.rules.min_market_price)} — {formatMoney(activeCat.rules.max_market_price)}
-                </p>
               </div>
+
+              <input type="number" style={{ ...field, fontSize: 20, fontWeight: 700, padding: '12px 16px' }}
+                placeholder="наприклад 28000"
+                value={marketPrice} onChange={e => { setMarketPrice(e.target.value); setResult(null); setSavedId('') }} />
+              <p style={{ fontSize: 11, color: C.muted2, marginTop: 6 }}>
+                Ліміти: {formatMoney(activeCat.rules.min_market_price)} — {formatMoney(activeCat.rules.max_market_price)}
+              </p>
+
+
             </div>
 
             {/* Completeness */}
@@ -367,6 +413,10 @@ export default function EstimatePage() {
                 fieldValues={fieldValues}
                 completeness={completeness}
                 comment={comment}
+                aiPrices={aiPrices}
+                aiLoading={aiLoading}
+                onFetchAiPrices={fetchAiPrices}
+                onSetMarketPrice={(p: number) => { setMarketPrice(String(p)); setResult(null); setSavedId('') }}
               />
             )}
           </div>
@@ -489,12 +539,23 @@ function BlockedResult({ reason, catName }: { reason: string; catName: string })
   )
 }
 
-function GoodResult({ result, evalType, marketPrice, brandVal, modelVal, catName, savedId, onPrint, showClientModal, setShowClientModal, lang, activeCat, fieldValues, completeness, comment }: {
+function GoodResult({ result, evalType, marketPrice, brandVal, modelVal, catName, savedId, onPrint, showClientModal, setShowClientModal, lang, activeCat, fieldValues, completeness, comment, aiPrices, aiLoading, onFetchAiPrices, onSetMarketPrice }: {
   result: EstimationResult; evalType: EvalType; marketPrice: number
   brandVal: string; modelVal: string; catName: string; savedId: string
   onPrint: () => void
   showClientModal: boolean; setShowClientModal: (v: boolean) => void
   lang: string; activeCat: any; fieldValues: Record<string,string>; completeness: string[]; comment: string
+  aiPrices?: {
+    new_price: number|null; used_price: number|null; avg_resale_price: number|null
+    price_range_used: string; popularity: string; popularity_reason: string
+    days_to_sell: string; recommendation: string; recommendation_text: string
+    margin_estimate: string; risks: string; market_trend: string
+    sources_new: string[]; sources_used: string[]; tip: string
+    device: string; condition: string
+  }|null
+  aiLoading?: boolean
+  onFetchAiPrices?: () => void
+  onSetMarketPrice?: (price: number) => void
 }) {
   const [showLiquidity, setShowLiquidity] = useState(false)
   const isGood = result.status === 'good'
@@ -559,14 +620,109 @@ function GoodResult({ result, evalType, marketPrice, brandVal, modelVal, catName
           </div>
         </div>
 
-        {/* AI Liquidity toggle */}
-        <button onClick={() => setShowLiquidity(!showLiquidity)} style={{
-          width: '100%', padding: '8px', borderRadius: 9, border: `1px solid ${C.border2}`,
-          background: 'transparent', color: C.muted, fontFamily: 'inherit', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-          marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        }}>
-          ⚡ {showLiquidity ? 'Сховати' : 'AI аналіз ліквідності'}
-        </button>
+        {/* AI ціни + ліквідність */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          {onFetchAiPrices && (
+            <button onClick={onFetchAiPrices} disabled={aiLoading}
+              style={{ flex: 1, padding: '8px', borderRadius: 9, border: `1px solid rgba(99,130,255,0.3)`, background: 'rgba(99,130,255,0.08)', color: '#6382FF', fontFamily: 'inherit', fontSize: 12, fontWeight: 600, cursor: aiLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              {aiLoading
+                ? <><span style={{ width: 12, height: 12, border: '2px solid rgba(99,130,255,0.3)', borderTopColor: '#6382FF', borderRadius: '50%', animation: 'spin .8s linear infinite', display: 'inline-block' }} /> Аналізуємо...</>
+                : <>✨ {aiPrices ? 'Оновити аналіз' : 'Допомога AI'}</>}
+            </button>
+          )}
+          <button onClick={() => setShowLiquidity(!showLiquidity)} style={{
+            flex: 1, padding: '8px', borderRadius: 9, border: `1px solid ${C.border2}`,
+            background: 'transparent', color: C.muted, fontFamily: 'inherit', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}>
+            ⚡ {showLiquidity ? 'Сховати' : 'AI ліквідність'}
+          </button>
+        </div>
+
+        {/* AI Full Report */}
+        {aiPrices && onSetMarketPrice && (() => {
+          const rec = aiPrices.recommendation
+          const recColor = rec === 'buy' ? '#34D98A' : rec === 'caution' ? '#FBBF24' : '#F87171'
+          const recBg = rec === 'buy' ? 'rgba(52,217,138,0.08)' : rec === 'caution' ? 'rgba(251,191,36,0.08)' : 'rgba(248,113,113,0.08)'
+          const recBorder = rec === 'buy' ? 'rgba(52,217,138,0.25)' : rec === 'caution' ? 'rgba(251,191,36,0.25)' : 'rgba(248,113,113,0.25)'
+          const recIcon = rec === 'buy' ? '✅' : rec === 'caution' ? '⚠️' : '❌'
+          return (
+            <div style={{ background: '#0E0E16', border: '1px solid #1E1E30', borderRadius: 16, padding: 20, marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                <span style={{ fontSize: 16 }}>✨</span>
+                <span style={{ fontSize: 13, fontWeight: 800, color: '#EDEDF0' }}>Аналіз AI — {aiPrices.device}</span>
+              </div>
+
+              {/* Recommendation banner */}
+              <div style={{ background: recBg, border: `1px solid ${recBorder}`, borderRadius: 12, padding: '14px 16px', marginBottom: 14 }}>
+                <p style={{ fontSize: 15, fontWeight: 900, color: recColor, marginBottom: 4 }}>{recIcon} {aiPrices.recommendation_text}</p>
+                {aiPrices.margin_estimate && <p style={{ fontSize: 12, color: '#8080AA' }}>📈 {aiPrices.margin_estimate}</p>}
+              </div>
+
+              {/* Price grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 14 }}>
+                {[
+                  { label: '🆕 Новий', value: aiPrices.new_price, color: '#6382FF' },
+                  { label: '♻️ Вживаний', value: aiPrices.used_price, color: '#34D98A' },
+                  { label: '💰 Перепродаж', value: aiPrices.avg_resale_price, color: '#FBBF24' },
+                ].map(({ label, value, color }) => (
+                  <div key={label} style={{ background: '#141422', borderRadius: 10, padding: '12px 10px', textAlign: 'center' as const }}>
+                    <p style={{ fontSize: 10, color: '#4A4A70', marginBottom: 4 }}>{label}</p>
+                    {value
+                      ? <p style={{ fontSize: 15, fontWeight: 900, color }}>{(value/1000).toFixed(1)}к ₴</p>
+                      : <p style={{ fontSize: 12, color: '#4A4A70' }}>—</p>}
+                  </div>
+                ))}
+              </div>
+
+              {/* Buttons to apply price */}
+              {(aiPrices.new_price || aiPrices.used_price) && (
+                <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                  {aiPrices.used_price && (
+                    <button onClick={() => onSetMarketPrice(aiPrices!.used_price!)}
+                      style={{ flex: 1, padding: '8px', borderRadius: 9, border: '1px solid rgba(52,217,138,0.3)', background: 'rgba(52,217,138,0.06)', color: '#34D98A', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                      Використати ціну вживаного ↑
+                    </button>
+                  )}
+                  {aiPrices.new_price && (
+                    <button onClick={() => onSetMarketPrice(aiPrices!.new_price!)}
+                      style={{ flex: 1, padding: '8px', borderRadius: 9, border: '1px solid rgba(99,130,255,0.3)', background: 'rgba(99,130,255,0.06)', color: '#6382FF', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                      Ціна нового ↑
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Info rows */}
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
+                {[
+                  aiPrices.popularity && { icon: '🔥', label: 'Популярність', value: `${aiPrices.popularity}${aiPrices.popularity_reason ? ` — ${aiPrices.popularity_reason}` : ''}` },
+                  aiPrices.days_to_sell && { icon: '⏱️', label: 'Термін продажу', value: aiPrices.days_to_sell },
+                  aiPrices.price_range_used && { icon: '📊', label: 'Діапазон вживаних', value: aiPrices.price_range_used },
+                  aiPrices.market_trend && { icon: '📉', label: 'Тренд', value: aiPrices.market_trend },
+                  aiPrices.risks && { icon: '⚠️', label: 'Що перевірити', value: aiPrices.risks },
+                  aiPrices.tip && { icon: '💡', label: 'Порада', value: aiPrices.tip },
+                ].filter(Boolean).map((row: any, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 10, fontSize: 12, lineHeight: 1.5 }}>
+                    <span style={{ flexShrink: 0 }}>{row.icon}</span>
+                    <span style={{ color: '#4A4A70', flexShrink: 0, minWidth: 110 }}>{row.label}:</span>
+                    <span style={{ color: '#EDEDF0' }}>{row.value}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Sources */}
+              {(aiPrices.sources_new?.length > 0 || aiPrices.sources_used?.length > 0) && (
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #1E1E30', fontSize: 11, color: '#4A4A70', lineHeight: 1.7 }}>
+                  {[...(aiPrices.sources_new || []), ...(aiPrices.sources_used || [])].map((s, i) => (
+                    <p key={i}>🔗 {s}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })()}
+
         {showLiquidity && brandVal && <LiquidityCard brand={brandVal} model={modelVal} category={catName} marketPrice={marketPrice} condition="" />}
 
         {/* Client Modal */}
