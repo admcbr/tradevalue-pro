@@ -436,6 +436,7 @@ export default function EstimatePage() {
                 comment={comment}
                 aiPrices={aiPrices}
                 aiLoading={aiLoading}
+                aiError={aiError}
                 onFetchAiPrices={fetchAiPrices}
                 onSetMarketPrice={(p: number) => { setMarketPrice(String(p)); setResult(null); setSavedId('') }}
               />
@@ -560,7 +561,7 @@ function BlockedResult({ reason, catName }: { reason: string; catName: string })
   )
 }
 
-function GoodResult({ result, evalType, marketPrice, brandVal, modelVal, catName, savedId, onPrint, showClientModal, setShowClientModal, lang, activeCat, fieldValues, completeness, comment, aiPrices, aiLoading, onFetchAiPrices, onSetMarketPrice }: {
+function GoodResult({ result, evalType, marketPrice, brandVal, modelVal, catName, savedId, onPrint, showClientModal, setShowClientModal, lang, activeCat, fieldValues, completeness, comment, aiPrices, aiLoading, aiError, onFetchAiPrices, onSetMarketPrice }: {
   result: EstimationResult; evalType: EvalType; marketPrice: number
   brandVal: string; modelVal: string; catName: string; savedId: string
   onPrint: () => void
@@ -575,6 +576,7 @@ function GoodResult({ result, evalType, marketPrice, brandVal, modelVal, catName
     device: string; condition: string
   }|null
   aiLoading?: boolean
+  aiError?: string
   onFetchAiPrices?: () => void
   onSetMarketPrice?: (price: number) => void
 }) {
@@ -642,12 +644,17 @@ function GoodResult({ result, evalType, marketPrice, brandVal, modelVal, catName
 
         {/* Допомога AI */}
         {onFetchAiPrices && (
-          <button onClick={onFetchAiPrices} disabled={aiLoading}
-            style={{ width: '100%', padding: '10px', borderRadius: 10, border: `1px solid rgba(99,130,255,0.3)`, background: 'rgba(99,130,255,0.08)', color: '#6382FF', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: aiLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
-            {aiLoading
-              ? <><span style={{ width: 13, height: 13, border: '2px solid rgba(99,130,255,0.3)', borderTopColor: '#6382FF', borderRadius: '50%', animation: 'spin .8s linear infinite', display: 'inline-block' }} /> Аналізуємо ринок...</>
-              : <>✨ {aiPrices ? 'Оновити аналіз' : 'Допомога AI'}</>}
-          </button>
+          <>
+            <button onClick={onFetchAiPrices} disabled={aiLoading}
+              style={{ width: '100%', padding: '10px', borderRadius: 10, border: `1px solid rgba(99,130,255,0.3)`, background: 'rgba(99,130,255,0.08)', color: '#6382FF', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: aiLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: aiError ? 6 : 12 }}>
+              {aiLoading
+                ? <><span style={{ width: 13, height: 13, border: '2px solid rgba(99,130,255,0.3)', borderTopColor: '#6382FF', borderRadius: '50%', animation: 'spin .8s linear infinite', display: 'inline-block' }} /> Аналізуємо ринок...</>
+                : <>✨ {aiPrices ? 'Оновити аналіз' : 'Допомога AI'}</>}
+            </button>
+            {aiError && (
+              <p style={{ fontSize: 12, color: '#F87171', marginBottom: 12, textAlign: 'center' as const }}>⚠️ {aiError}</p>
+            )}
+          </>
         )}
 
         {/* AI Full Report */}

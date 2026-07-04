@@ -18,6 +18,7 @@ export default function HistoryPage() {
   const isUk = lang === 'uk'
   const [data, setData] = useState<any[]>([])
   const [aiModal, setAiModal] = useState<any>(null)
+  const [aiLoading, setAiLoading] = useState<string>('') // stores estimation id being loaded
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterCat, setFilterCat] = useState('')
@@ -58,7 +59,50 @@ export default function HistoryPage() {
   const cats = [...new Set(data.map(e => e.category_name))]
   const filtered = data.filter(e => {
     const q = search.toLowerCase()
-    return (!q || (e.brand_name||'').toLowerCase().includes(q) || (e.model_name||'').toLowerCase().includes(q) || e.category_name.toLowerCase().includes(q))
+    async function fetchAiForEstimation(e: any) {
+    if (aiLoading) return
+    // If already has ai_analysis — just show it
+    if (e.ai_analysis) { setAiModal(e.ai_analysis); return }
+
+    // Build specs from field_values
+    const specs: string[] = []
+    if (e.field_values && typeof e.field_values === 'object') {
+      Object.entries(e.field_values).forEach(([, val]: any) => {
+        if (val && val !== 'false' && val !== '__custom__') {
+          // We don't have field names here, just values — send as list
+          specs.push(String(val))
+        }
+      })
+    }
+
+    setAiLoading(e.id)
+    try {
+      const res = await fetch('/api/ai/market-price', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brand: e.brand_name || '',
+          model: e.model_name || '',
+          category: e.category_name || '',
+          condition: '',
+          specs: [],
+          buy_price: e.buy_price,
+          market_price: e.market_price,
+        }),
+      })
+      const data = await res.json()
+      if (!data.error) {
+        setAiModal(data)
+        // Save to estimation record
+        const supabase = (await import('@/lib/supabase')).createClient()
+        await supabase.from('estimations').update({ ai_analysis: data }).eq('id', e.id)
+        setData(prev => prev.map(est => est.id === e.id ? { ...est, ai_analysis: data } : est))
+      }
+    } catch {}
+    setAiLoading('')
+  }
+
+  return (!q || (e.brand_name||'').toLowerCase().includes(q) || (e.model_name||'').toLowerCase().includes(q) || e.category_name.toLowerCase().includes(q))
       && (!filterCat || e.category_name === filterCat)
       && (!filterStatus || e.status === filterStatus)
   })
@@ -72,6 +116,36 @@ export default function HistoryPage() {
     ].join(','))
     const csv = [['Дата','Категорія','Бренд','Модель','Ринкова','Викуп','Прибуток','Рент.','Статус'].join(','), ...rows].join('\n')
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv'})); a.download='tradevalue-history.csv'; a.click()
+  }
+
+  async function fetchAiForEstimation(est: any) {
+    if (aiLoading) return
+    if (est.ai_analysis) { setAiModal(est.ai_analysis); return }
+    setAiLoading(est.id)
+    try {
+      const res = await fetch('/api/ai/market-price', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brand: est.brand_name || '',
+          model: est.model_name || '',
+          category: est.category_name || '',
+          condition: '',
+          specs: [],
+          buy_price: est.buy_price,
+          market_price: est.market_price,
+        }),
+      })
+      const result = await res.json()
+      if (!result.error) {
+        setAiModal(result)
+        const { createClient } = await import('@/lib/supabase')
+        const sb = createClient()
+        await sb.from('estimations').update({ ai_analysis: result }).eq('id', est.id)
+        setData(prev => prev.map(e => e.id === est.id ? { ...e, ai_analysis: result } : e))
+      }
+    } catch {}
+    setAiLoading('')
   }
 
   return (
@@ -138,9 +212,12 @@ export default function HistoryPage() {
                     <td style={td}>
                       <div style={{ display:'flex', gap:6 }}>
                         <button onClick={()=>printInvoice(e as any,'','Techno Shop')} style={{ padding:'4px 10px', borderRadius:7, border:`1px solid ${C.border2}`, background:'transparent', color:C.muted, cursor:'pointer', fontSize:11 }}>🖨</button>
-                        {e.ai_analysis && (
-                          <button onClick={()=>setAiModal(e.ai_analysis)} style={{ padding:'4px 10px', borderRadius:7, border:'1px solid rgba(99,130,255,0.3)', background:'rgba(99,130,255,0.08)', color:'#6382FF', cursor:'pointer', fontSize:11, fontWeight:700 }}>✨ AI</button>
-                        )}
+                        <button
+                          onClick={()=>fetchAiForEstimation(e)}
+                          disabled={aiLoading === e.id}
+                          style={{ padding:'4px 10px', borderRadius:7, border:'1px solid rgba(99,130,255,0.3)', background: e.ai_analysis ? 'rgba(99,130,255,0.15)' : 'rgba(99,130,255,0.05)', color:'#6382FF', cursor: aiLoading===e.id ? 'not-allowed' : 'pointer', fontSize:11, fontWeight:700, opacity: aiLoading===e.id ? 0.6 : 1 }}>
+                          {aiLoading===e.id ? '...' : '✨ AI'}
+                        </button>
                         <button onClick={()=>handleDelete(e.id)} style={{ padding:'4px 10px', borderRadius:7, border:'1px solid rgba(248,113,113,0.2)', background:'transparent', color:C.danger, cursor:'pointer', fontSize:11 }}>✕</button>
                       </div>
                     </td>
