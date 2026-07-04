@@ -557,7 +557,6 @@ function GoodResult({ result, evalType, marketPrice, brandVal, modelVal, catName
   onFetchAiPrices?: () => void
   onSetMarketPrice?: (price: number) => void
 }) {
-  const [showLiquidity, setShowLiquidity] = useState(false)
   const isGood = result.status === 'good'
   return (
     <div style={{
@@ -620,24 +619,15 @@ function GoodResult({ result, evalType, marketPrice, brandVal, modelVal, catName
           </div>
         </div>
 
-        {/* AI ціни + ліквідність */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-          {onFetchAiPrices && (
-            <button onClick={onFetchAiPrices} disabled={aiLoading}
-              style={{ flex: 1, padding: '8px', borderRadius: 9, border: `1px solid rgba(99,130,255,0.3)`, background: 'rgba(99,130,255,0.08)', color: '#6382FF', fontFamily: 'inherit', fontSize: 12, fontWeight: 600, cursor: aiLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              {aiLoading
-                ? <><span style={{ width: 12, height: 12, border: '2px solid rgba(99,130,255,0.3)', borderTopColor: '#6382FF', borderRadius: '50%', animation: 'spin .8s linear infinite', display: 'inline-block' }} /> Аналізуємо...</>
-                : <>✨ {aiPrices ? 'Оновити аналіз' : 'Допомога AI'}</>}
-            </button>
-          )}
-          <button onClick={() => setShowLiquidity(!showLiquidity)} style={{
-            flex: 1, padding: '8px', borderRadius: 9, border: `1px solid ${C.border2}`,
-            background: 'transparent', color: C.muted, fontFamily: 'inherit', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-          }}>
-            ⚡ {showLiquidity ? 'Сховати' : 'AI ліквідність'}
+        {/* Допомога AI */}
+        {onFetchAiPrices && (
+          <button onClick={onFetchAiPrices} disabled={aiLoading}
+            style={{ width: '100%', padding: '10px', borderRadius: 10, border: `1px solid rgba(99,130,255,0.3)`, background: 'rgba(99,130,255,0.08)', color: '#6382FF', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: aiLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
+            {aiLoading
+              ? <><span style={{ width: 13, height: 13, border: '2px solid rgba(99,130,255,0.3)', borderTopColor: '#6382FF', borderRadius: '50%', animation: 'spin .8s linear infinite', display: 'inline-block' }} /> Аналізуємо ринок...</>
+              : <>✨ {aiPrices ? 'Оновити аналіз' : 'Допомога AI'}</>}
           </button>
-        </div>
+        )}
 
         {/* AI Full Report */}
         {aiPrices && onSetMarketPrice && (() => {
@@ -723,7 +713,7 @@ function GoodResult({ result, evalType, marketPrice, brandVal, modelVal, catName
           )
         })()}
 
-        {showLiquidity && brandVal && <LiquidityCard brand={brandVal} model={modelVal} category={catName} marketPrice={marketPrice} condition="" />}
+
 
         {/* Client Modal */}
         {showClientModal && (
