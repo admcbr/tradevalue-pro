@@ -17,6 +17,7 @@ export default function HistoryPage() {
   const { t, lang } = useLang()
   const isUk = lang === 'uk'
   const [data, setData] = useState<any[]>([])
+  const [aiModal, setAiModal] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterCat, setFilterCat] = useState('')
@@ -74,6 +75,7 @@ export default function HistoryPage() {
   }
 
   return (
+    <>
     <div style={{ padding:'28px 32px', maxWidth:1200 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:24 }}>
         <div>
@@ -136,6 +138,9 @@ export default function HistoryPage() {
                     <td style={td}>
                       <div style={{ display:'flex', gap:6 }}>
                         <button onClick={()=>printInvoice(e as any,'','Techno Shop')} style={{ padding:'4px 10px', borderRadius:7, border:`1px solid ${C.border2}`, background:'transparent', color:C.muted, cursor:'pointer', fontSize:11 }}>🖨</button>
+                        {e.ai_analysis && (
+                          <button onClick={()=>setAiModal(e.ai_analysis)} style={{ padding:'4px 10px', borderRadius:7, border:'1px solid rgba(99,130,255,0.3)', background:'rgba(99,130,255,0.08)', color:'#6382FF', cursor:'pointer', fontSize:11, fontWeight:700 }}>✨ AI</button>
+                        )}
                         <button onClick={()=>handleDelete(e.id)} style={{ padding:'4px 10px', borderRadius:7, border:'1px solid rgba(248,113,113,0.2)', background:'transparent', color:C.danger, cursor:'pointer', fontSize:11 }}>✕</button>
                       </div>
                     </td>
@@ -148,5 +153,76 @@ export default function HistoryPage() {
       </Card>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
+
+      {/* AI Analysis Modal */}
+      {aiModal && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}
+          onClick={()=>setAiModal(null)}>
+          <div style={{ background:'#0E0E16', border:'1px solid #1E1E30', borderRadius:20, padding:28, maxWidth:520, width:'100%', maxHeight:'85vh', overflowY:'auto' }}
+            onClick={e=>e.stopPropagation()}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <span style={{ fontSize:18 }}>✨</span>
+                <span style={{ fontSize:15, fontWeight:800, color:'#EDEDF0' }}>AI Аналіз</span>
+                {aiModal.device && <span style={{ fontSize:12, color:'#8080AA' }}>— {aiModal.device}</span>}
+              </div>
+              <button onClick={()=>setAiModal(null)} style={{ background:'none', border:'none', color:'#4A4A70', fontSize:22, cursor:'pointer' }}>×</button>
+            </div>
+
+            {aiModal.recommendation && (() => {
+              const rec = aiModal.recommendation
+              const recColor = rec==='buy'?'#34D98A':rec==='caution'?'#FBBF24':'#F87171'
+              const recBg = rec==='buy'?'rgba(52,217,138,0.08)':rec==='caution'?'rgba(251,191,36,0.08)':'rgba(248,113,113,0.08)'
+              const recBorder = rec==='buy'?'rgba(52,217,138,0.25)':rec==='caution'?'rgba(251,191,36,0.25)':'rgba(248,113,113,0.25)'
+              const recIcon = rec==='buy'?'✅':rec==='caution'?'⚠️':'❌'
+              return (
+                <div style={{ background:recBg, border:`1px solid ${recBorder}`, borderRadius:12, padding:'14px 16px', marginBottom:16 }}>
+                  <p style={{ fontSize:14, fontWeight:900, color:recColor, marginBottom:4 }}>{recIcon} {aiModal.recommendation_text}</p>
+                  {aiModal.margin_estimate && <p style={{ fontSize:12, color:'#8080AA' }}>📈 {aiModal.margin_estimate}</p>}
+                </div>
+              )
+            })()}
+
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, marginBottom:16 }}>
+              {[
+                { label:'🆕 Новий', value:aiModal.new_price, color:'#6382FF' },
+                { label:'♻️ Вживаний', value:aiModal.used_price, color:'#34D98A' },
+                { label:'💰 Перепродаж', value:aiModal.avg_resale_price, color:'#FBBF24' },
+              ].map(({label,value,color})=>(
+                <div key={label} style={{ background:'#141422', borderRadius:10, padding:'12px 8px', textAlign:'center' as const }}>
+                  <p style={{ fontSize:10, color:'#4A4A70', marginBottom:4 }}>{label}</p>
+                  {value ? <p style={{ fontSize:15, fontWeight:900, color }}>{(value/1000).toFixed(1)}к ₴</p> : <p style={{ fontSize:12, color:'#4A4A70' }}>—</p>}
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display:'flex', flexDirection:'column' as const, gap:8 }}>
+              {[
+                aiModal.popularity&&{ icon:'🔥', label:'Популярність', value:`${aiModal.popularity}${aiModal.popularity_reason?` — ${aiModal.popularity_reason}`:''}` },
+                aiModal.days_to_sell&&{ icon:'⏱️', label:'Термін продажу', value:aiModal.days_to_sell },
+                aiModal.price_range_used&&{ icon:'📊', label:'Діапазон вживаних', value:aiModal.price_range_used },
+                aiModal.market_trend&&{ icon:'📉', label:'Тренд', value:aiModal.market_trend },
+                aiModal.risks&&{ icon:'⚠️', label:'Що перевірити', value:aiModal.risks },
+                aiModal.tip&&{ icon:'💡', label:'Порада', value:aiModal.tip },
+              ].filter(Boolean).map((row:any,i:number)=>(
+                <div key={i} style={{ display:'flex', gap:10, fontSize:12, lineHeight:1.6 }}>
+                  <span>{row.icon}</span>
+                  <span style={{ color:'#4A4A70', minWidth:110, flexShrink:0 }}>{row.label}:</span>
+                  <span style={{ color:'#EDEDF0' }}>{row.value}</span>
+                </div>
+              ))}
+            </div>
+
+            {((aiModal.sources_new?.length>0)||(aiModal.sources_used?.length>0)) && (
+              <div style={{ marginTop:14, paddingTop:14, borderTop:'1px solid #1E1E30', fontSize:11, color:'#4A4A70', lineHeight:1.7 }}>
+                {[...(aiModal.sources_new||[]),...(aiModal.sources_used||[])].map((s:string,i:number)=>(
+                  <p key={i}>🔗 {s}</p>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   )
 }

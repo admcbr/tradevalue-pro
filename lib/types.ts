@@ -123,6 +123,7 @@ export interface Estimation {
   completeness_values: string[]   // ids of present items
   comment: string
   created_at: string
+  ai_analysis?: any
 }
 
 // ─── Result (transient, not stored) ──────────────────────────────────────────

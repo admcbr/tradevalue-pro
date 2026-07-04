@@ -90,13 +90,15 @@ export async function POST(request: Request) {
 
     // Save estimation
     const body = await request.json()
+    const { ai_analysis, ...estimationData } = body
 
     const { data: saved, error: insertError } = await supabaseAdmin
       .from('estimations')
       .insert({
         company_id: userRecord.company_id,
         user_id: user.id,
-        ...body,
+        ...estimationData,
+        ...(ai_analysis ? { ai_analysis } : {}),
       })
       .select()
       .maybeSingle()

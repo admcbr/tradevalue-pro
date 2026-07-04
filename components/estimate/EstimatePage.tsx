@@ -81,15 +81,35 @@ export default function EstimatePage() {
     setAiLoading(true)
     setAiError('')
     setAiPrices(null)
-    // Get current condition from field values
-    const condField = activeCat.fields.find((f: any) => f.name === 'Стан' || f.id === 'condition')
-    const condition = condField ? fieldValues[condField.id] : ''
+
+    // Collect ALL filled fields except brand/model as specs
+    const SKIP = ['Бренд', 'Виробник', 'Модель', 'Модель GPU', 'Назва товару']
+    const specs: string[] = []
+    for (const field of activeCat.fields) {
+      if (SKIP.includes(field.name)) continue
+      const val = fieldValues[field.id]
+      if (!val || val === 'false' || val === '__custom__') continue
+      specs.push(`${field.name}: ${val}`)
+    }
+
+    // Condition separately for new/used logic
+    const condField = activeCat.fields.find((f: any) =>
+      f.name === 'Стан' || f.name === 'Стан пристрою' || f.name === 'Condition')
+    const condition = condField ? (fieldValues[condField.id] || '') : ''
 
     try {
       const res = await fetch('/api/ai/market-price', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brand, model, category: activeCat.name, condition }),
+        body: JSON.stringify({
+          brand,
+          model,
+          category: activeCat.name,
+          condition,
+          specs,
+          buy_price: result?.buy_price,
+          market_price: parseFloat(marketPrice) || undefined,
+        }),
       })
       const data = await res.json()
       if (data.error) { setAiError(data.error); return }
@@ -155,6 +175,7 @@ export default function EstimatePage() {
           body: JSON.stringify({
             category_id: activeCat.id,
             category_name: activeCat.name,
+            ai_analysis: aiPrices || null,
             brand_name: brand ? fieldValues[brand.id] : '',
             model_name: model ? fieldValues[model.id] : '',
             eval_type: evalType,
